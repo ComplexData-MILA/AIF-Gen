@@ -29,6 +29,8 @@ python baselines/trl/dpo_continual.py \
 
 [//]: # (ultrafeedback2anthropic)
 
+# The TRL README:
+
 ```bash
 <div style="text-align: center">
 <img src="https://huggingface.co/datasets/trl-lib/documentation-images/resolve/main/trl_banner_dark.png" alt="TRL Banner">

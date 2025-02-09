@@ -1,4 +1,4 @@
-# Adaptation of the DPO training script for continual learning.
+# Adaptation of the DPO TRL training script for continual learning.
 
 """
 # Full training
