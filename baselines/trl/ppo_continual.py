@@ -1,11 +1,11 @@
 # Adaptation of the PPO TRL training script for continual learning.
 
 import shutil
-
 import wandb
+import os
+
 import torch
 from accelerate import PartialState
-from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
@@ -21,53 +21,26 @@ from trl import (
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
+    apply_chat_template,
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
 from aif_gen.dataset import DebugContinualDataset, ContinualUltrafeedback2AnthropicDataset
 
 """
-python -i examples/scripts/ppo/ppo.py \
-    --dataset_name trl-internal-testing/descriptiveness-sentiment-trl-style \
+python baselines/trl/ppo_continual.py \
+    --dataset_name debug \
     --dataset_train_split descriptiveness \
     --learning_rate 3e-6 \
     --output_dir models/minimal/ppo \
-    --per_device_train_batch_size 64 \
+    --per_device_train_batch_size 8 \
     --gradient_accumulation_steps 1 \
-    --total_episodes 10000 \
-    --model_name_or_path EleutherAI/pythia-1b-deduped \
-    --missing_eos_penalty 1.0
-
-
-python -i examples/scripts/ppo/ppo.py \
-    --dataset_name trl-internal-testing/descriptiveness-sentiment-trl-style \
-    --dataset_train_split descriptiveness \
-    --learning_rate 3e-6 \
-    --output_dir models/minimal/ppo \
-    --per_device_train_batch_size 64 \
-    --gradient_accumulation_steps 1 \
-    --total_episodes 10000 \
+    --total_episodes 20 \
     --use_peft \
-    --model_name_or_path EleutherAI/pythia-1b-deduped \
-    --missing_eos_penalty 1.0    
-    
-
-accelerate launch --config_file examples/accelerate_configs/deepspeed_zero3.yaml \
-    examples/scripts/ppo/ppo.py \
-    --dataset_name trl-internal-testing/descriptiveness-sentiment-trl-style \
-    --dataset_train_split descriptiveness \
-    --output_dir models/minimal/ppo \
-    --num_ppo_epochs 1 \
-    --num_mini_batches 1 \
-    --learning_rate 3e-6 \
-    --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 16 \
-    --total_episodes 10000 \
-    --model_name_or_path EleutherAI/pythia-1b-deduped \
-    --sft_model_path EleutherAI/pythia-1b-deduped \
-    --reward_model_path EleutherAI/pythia-1b-deduped \
-    --local_rollout_forward_batch_size 1 \
-    --missing_eos_penalty 1.0
+    --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
+    --sft_model_path Qwen/Qwen2-0.5B-Instruct \
+    --reward_model_path /home/mila/i/ivan.anokhin/AIF-Gen/Qwen/Qwen2-0.5B-Reward/debug \
+    --missing_eos_penalty 1.0      
 """
 
 
@@ -98,8 +71,9 @@ if __name__ == "__main__":
     tokenizer.add_special_tokens({"pad_token": "[PAD]"})
     if tokenizer.chat_template is None:
         tokenizer.chat_template = SIMPLE_CHAT_TEMPLATE
+    value_model_path = "/home/mila/i/ivan.anokhin/AIF-Gen/Qwen/Qwen2-0.5B-Reward/debug/0"
     value_model = AutoModelForSequenceClassification.from_pretrained(
-        training_args.reward_model_path, trust_remote_code=model_args.trust_remote_code, num_labels=1
+        value_model_path, trust_remote_code=model_args.trust_remote_code, num_labels=1
     )
     policy = AutoModelForCausalLM.from_pretrained(
         training_args.sft_model_path, trust_remote_code=model_args.trust_remote_code
@@ -116,11 +90,15 @@ if __name__ == "__main__":
     ################
     # Dataset
     ################
-    datasets = [load_dataset(
-        script_args.dataset_name, name=script_args.dataset_config, split=script_args.dataset_train_split
-    )]
+    if script_args.dataset_name == 'debug':
+        continual_dataset = DebugContinualDataset()
+    elif script_args.dataset_name == 'ultrafeedback2anthropic':
+        continual_dataset = ContinualUltrafeedback2AnthropicDataset()
+    else:
+        raise ValueError(f"Unknown dataset: {script_args.dataset_name}")
     eval_samples = 100
 
+    dataset_text_field = "prompt"
     def prepare_dataset(dataset, tokenizer):
         """pre-tokenize the dataset before training; only collate during training"""
 
@@ -138,23 +116,27 @@ if __name__ == "__main__":
             num_proc=training_args.dataset_num_proc,
         )
 
-    for i, dataset in enumerate(datasets):
+    for i in range(len(continual_dataset.datasets)):
+        assert os.path.exists(training_args.reward_model_path+f"/{str(i)}"), f"Reward model not found for dataset {i}"
 
-        reward_model = AutoModelForSequenceClassification.from_pretrained(
-            training_args.reward_model_path, trust_remote_code=model_args.trust_remote_code, num_labels=1
-        )
-        # ToDo: Value model is based on the reward model, so we need to think if we should reinstantiate
-        #  the value model with the new reward model when we change dataset or continue to train the old one
+    for i, dataset in enumerate(continual_dataset.datasets):
 
+        # Dataset
+        dataset = dataset[script_args.dataset_train_split]
+        dataset = dataset.map(apply_chat_template, fn_kwargs={"tokenizer": tokenizer})
         train_dataset = dataset.select(range(len(dataset) - eval_samples))
         eval_dataset = dataset.select(range(len(dataset) - eval_samples, len(dataset)))
-        dataset_text_field = "prompt"
 
         # Compute that only on the main process for faster data processing.
         # see: https://github.com/huggingface/trl/pull/1255
         with PartialState().local_main_process_first():
             train_dataset = prepare_dataset(train_dataset, tokenizer)
             eval_dataset = prepare_dataset(eval_dataset, tokenizer)
+
+        # Reward model
+        reward_model = AutoModelForSequenceClassification.from_pretrained(training_args.reward_model_path+f"/{str(i)}", num_labels=1)
+        # ToDo: Value model is based on the reward model, so we need to think if we want to reinstantiate
+        #  the value model with the new reward model when we change dataset or continue to train with the old one
 
         ################
         # Training
@@ -172,9 +154,11 @@ if __name__ == "__main__":
         )
         trainer.train()
 
+        # ToDo: PPOTrainer doesn't have an evaluate method, so we need to implement it to track the performance at each dataset
+
         # Save and push to hub
-        trainer.save_model(training_args.output_dir)
+        trainer.save_model(training_args.output_dir + f"/dataset-{i}")
         if training_args.push_to_hub:
-            trainer.push_to_hub(dataset_name=script_args.dataset_name)
+            trainer.push_to_hub(dataset_name=script_args.dataset_name + f"/dataset-{i}")
 
         trainer.generate_completions()

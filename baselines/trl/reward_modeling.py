@@ -2,9 +2,10 @@
 
 """
 Full training:
-python examples/scripts/reward_modeling.py \
+python baselines/trl/reward_modeling.py \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
-    --dataset_name trl-lib/ultrafeedback_binarized \
+    --dataset_name debug \
+    --dataset_index 2 \
     --output_dir Qwen2-0.5B-Reward \
     --per_device_train_batch_size 8 \
     --num_train_epochs 1 \
@@ -16,9 +17,9 @@ python examples/scripts/reward_modeling.py \
     --max_length 2048
 
 LoRA:
-python examples/scripts/reward_modeling.py \
+python baselines/trl/reward_modeling.py \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
-    --dataset_name trl-lib/ultrafeedback_binarized \
+    --dataset_name debug \
     --output_dir Qwen2-0.5B-Reward-LoRA \
     --per_device_train_batch_size 8 \
     --num_train_epochs 1 \
@@ -55,7 +56,8 @@ from aif_gen.dataset import DebugContinualDataset, ContinualUltrafeedback2Anthro
 
 @dataclass
 class ExtendedScriptArguments(ScriptArguments):
-    dataset_index: int = field(default=0, metadata={"help": "Index of the dataset to use, dataset points to ContinualDataset, this index points to individual dataset in the ContinualDataset."})
+    dataset_index: int = field(default=0, metadata={"help": "Index of the dataset to use, dataset points to ContinualDataset, "
+                                                            "this index points to individual dataset in the ContinualDataset."})
 
 
 if __name__ == "__main__":
@@ -102,9 +104,9 @@ if __name__ == "__main__":
     ##############
     # dataset = load_dataset(script_args.dataset_name, name=script_args.dataset_config)
     if script_args.dataset_name == 'debug':
-        dataset = DebugContinualDataset()[script_args.dataset_index]
+        dataset = DebugContinualDataset().datasets[script_args.dataset_index]
     elif script_args.dataset_name == 'ultrafeedback2anthropic':
-        dataset = ContinualUltrafeedback2AnthropicDataset()[script_args.dataset_index]
+        dataset = ContinualUltrafeedback2AnthropicDataset().datasets[script_args.dataset_index]
     else:
         raise ValueError(f"Unknown dataset: {script_args.dataset_name}")
 
@@ -124,7 +126,8 @@ if __name__ == "__main__":
     ############################
     # Save model and push to Hub
     ############################
-    trainer.save_model(training_args.output_dir+"_dataset-"+str(script_args.dataset_index))
+    print('Saving model to:', training_args.output_dir)
+    trainer.save_model(training_args.output_dir+f"/{script_args.dataset_name}/"+str(script_args.dataset_index))
 
     if training_args.eval_strategy != "no":
         metrics = trainer.evaluate()

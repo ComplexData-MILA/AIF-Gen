@@ -2,7 +2,7 @@
 
 """
 # Full training
-python trl/slurm_scripts/dpo.py \
+python baselines/trl/dpo_continual.py \
     --dataset_name trl-lib/ultrafeedback_binarized \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
     --learning_rate 5.0e-7 \
@@ -17,8 +17,8 @@ python trl/slurm_scripts/dpo.py \
     --no_remove_unused_columns
 
 # LoRA:
-python trl/slurm_scripts/dpo.py \
-    --dataset_name trl-lib/ultrafeedback_binarized \
+python baselines/trl/dpo_continual.py \
+    --dataset_name debug \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
     --learning_rate 5.0e-6 \
     --num_train_epochs 1 \
@@ -107,6 +107,7 @@ def main(script_args, training_args, model_args):
 
     for i, dataset in enumerate(continual_dataset.datasets):
 
+        print('dataset', dataset[script_args.dataset_train_split]['chosen'])
         ##########
         # Training
         ################
