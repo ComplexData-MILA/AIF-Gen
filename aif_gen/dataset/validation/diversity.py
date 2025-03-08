@@ -1,6 +1,6 @@
 import logging
 import multiprocessing as mp
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import nltk
 import numpy as np
@@ -12,7 +12,7 @@ from aif_gen.typing import Dataset
 
 
 def diversity_validation(
-    dataset: Dataset, num_workers: int, ngram: int = 3
+    dataset: Dataset, num_workers: int, ngram: int = 3, n_references: Optional[int] = 20
 ) -> List[Optional[Dict[str, float]]]:
     r"""Report the inverse Self-BLEU score as a measure of diversity within the generated samples.
 
@@ -20,6 +20,7 @@ def diversity_validation(
         dataset (Union[ContinualAlignmentDataset, AlignmentDataset]): The dataset to validate.
         num_workers (int): Number of sub-process workers to spawn for the diversity validation.
         ngram (int): The maximum n-gram order for BLEU calculation. Default of 3 matches the original paper.
+        n_references (Optional[int]): The number of references to sample for each BLEU calculation. Uses all data samples if None.
 
     Returns:
         List[Optional[Dict[str, float]]]: For every AlignmentDataset, returns a dictionary with entries of the form '{metric}_{stat}':
@@ -50,7 +51,7 @@ def diversity_validation(
     results: List[Optional[Dict[str, float]]] = []
     for dataset in datasets:
         if len(dataset):
-            result = _diversity_validation(dataset, num_workers, ngram)
+            result = _diversity_validation(dataset, num_workers, ngram, n_references)
         else:
             logging.warning(f'Skipping diversity on empty dataset: {dataset}')
             result = None
@@ -59,7 +60,10 @@ def diversity_validation(
 
 
 def _diversity_validation(
-    dataset: AlignmentDataset, num_workers: int, ngram: int
+    dataset: AlignmentDataset,
+    num_workers: int,
+    ngram: int,
+    n_references: Optional[int],
 ) -> Dict[str, float]:
     weight = [1.0 / ngram for _ in range(ngram)]
     prompts = [sample.prompt for sample in dataset.samples]
@@ -68,18 +72,27 @@ def _diversity_validation(
 
     results: Dict[str, List[float]] = {}
     logging.info('Computing prompt diversity')
-    results['prompt_diversity'] = _compute_diversity(prompts, weight, num_workers)
+    results['prompt_diversity'] = _compute_diversity(
+        prompts, weight, num_workers, n_references
+    )
 
     logging.info('Computing chosen response diversity')
-    results['chosen_diversity'] = _compute_diversity(chosens, weight, num_workers)
+    results['chosen_diversity'] = _compute_diversity(
+        chosens, weight, num_workers, n_references
+    )
 
     logging.info('Computing rejected response diversity')
-    results['rejected_diversity'] = _compute_diversity(rejected, weight, num_workers)
+    results['rejected_diversity'] = _compute_diversity(
+        rejected, weight, num_workers, n_references
+    )
     return _compute_statistics(results)
 
 
 def _compute_diversity(
-    response_set: List[str], weight: List[float], num_workers: int
+    response_set: List[str],
+    weight: List[float],
+    num_workers: int,
+    n_references: Optional[int],
 ) -> List[float]:
     if 0 <= len(response_set) < 2:
         return len(response_set) * [0.0]
@@ -89,26 +102,41 @@ def _compute_diversity(
     tokenized_responses = [tokenizer(sentence) for sentence in response_set]
 
     with mp.Pool(num_workers) as pool:
-        return pool.starmap(
-            _diversity_score,
-            tqdm.tqdm(
-                [
-                    (
-                        tokenized_responses[:i] + tokenized_responses[i + 1 :],
-                        hypothesis,
-                        weight,
-                    )
-                    for i, hypothesis in enumerate(tokenized_responses)
-                ],
+        return [
+            score
+            for score in tqdm.tqdm(
+                pool.imap_unordered(
+                    _diversity_score_wrapper,
+                    [
+                        [tokenized_responses, i, weight, n_references]
+                        for i in range(len(tokenized_responses))
+                    ],
+                    chunksize=len(tokenized_responses) // num_workers,
+                ),
                 total=len(tokenized_responses),
-            ),
+            )
+        ]
+
+
+def _diversity_score_wrapper(args: List[Any]) -> float:
+    return _diversity_score(*args)
+
+
+def _diversity_score(
+    responses: List[str], i: int, weight: List[str], n_references: Optional[int]
+) -> float:
+    if n_references is not None:
+        sample_indices = np.random.choice(
+            [idx for idx in range(len(responses)) if idx != i],
+            size=n_references,
         )
+        references = [responses[idx] for idx in sample_indices]
+    else:
+        references = responses
 
-
-def _diversity_score(responses: List[str], hypothesis: str, weight: List[str]) -> float:
     score = sentence_bleu(
-        responses,
-        hypothesis,
+        references,
+        responses[i],
         weight,
         smoothing_function=SmoothingFunction().method1,
     )
