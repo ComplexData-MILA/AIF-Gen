@@ -4,6 +4,7 @@ from typing import Callable, Dict, List, Optional
 
 import nltk
 import numpy as np
+import tqdm
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
@@ -66,8 +67,13 @@ def _diversity_validation(
     rejected = [sample.rejected for sample in dataset.samples]
 
     results: Dict[str, List[float]] = {}
+    logging.info('Computing prompt diversity')
     results['prompt_diversity'] = _compute_diversity(prompts, weight, num_workers)
+
+    logging.info('Computing chosen response diversity')
     results['chosen_diversity'] = _compute_diversity(chosens, weight, num_workers)
+
+    logging.info('Computing rejected response diversity')
     results['rejected_diversity'] = _compute_diversity(rejected, weight, num_workers)
     return _compute_statistics(results)
 
@@ -78,20 +84,24 @@ def _compute_diversity(
     if 0 <= len(response_set) < 2:
         return len(response_set) * [0.0]
 
+    logging.info('Tokenizing responses')
     tokenizer = _get_tokenizer()
     tokenized_responses = [tokenizer(sentence) for sentence in response_set]
 
     with mp.Pool(num_workers) as pool:
         return pool.starmap(
             _diversity_score,
-            [
-                (
-                    tokenized_responses[:i] + tokenized_responses[i + 1 :],
-                    hypothesis,
-                    weight,
-                )
-                for i, hypothesis in enumerate(tokenized_responses)
-            ],
+            tqdm.tqdm(
+                [
+                    (
+                        tokenized_responses[:i] + tokenized_responses[i + 1 :],
+                        hypothesis,
+                        weight,
+                    )
+                    for i, hypothesis in enumerate(tokenized_responses)
+                ],
+                total=len(tokenized_responses),
+            ),
         )
 
 
