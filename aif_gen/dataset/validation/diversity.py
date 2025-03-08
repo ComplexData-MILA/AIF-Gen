@@ -101,6 +101,8 @@ def _compute_diversity(
     tokenizer = _get_tokenizer()
     tokenized_responses = [tokenizer(sentence) for sentence in response_set]
 
+    chunksize = max(len(tokenized_responses) // num_workers, 1)
+
     with mp.Pool(num_workers) as pool:
         return [
             score
@@ -111,7 +113,7 @@ def _compute_diversity(
                         [tokenized_responses, i, weight, n_references]
                         for i in range(len(tokenized_responses))
                     ],
-                    chunksize=len(tokenized_responses) // num_workers,
+                    chunksize=chunksize,
                 ),
                 total=len(tokenized_responses),
             )
