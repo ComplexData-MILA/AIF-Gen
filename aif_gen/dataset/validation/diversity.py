@@ -1,24 +1,27 @@
 import logging
-import multiprocessing as mp
-from typing import Any, Callable, Dict, List, Optional
+from typing import Dict, List, Optional
+from math import ceil
 
 import nltk
 import numpy as np
 import tqdm
-from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
+from transformers import AutoTokenizer
+
 
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
 from aif_gen.typing import Dataset
+from aif_gen.dataset.validation.jax_bleu_utils import calculate_bleu_similarity
 
 
 def diversity_validation(
-    dataset: Dataset, num_workers: int, ngram: int = 3, n_references: Optional[int] = 20
+    dataset: Dataset, batch_size: int, ngram: int = 3, n_references: Optional[int] = 20
 ) -> List[Optional[Dict[str, float]]]:
     r"""Report the inverse Self-BLEU score as a measure of diversity within the generated samples.
 
     Args:
         dataset (Union[ContinualAlignmentDataset, AlignmentDataset]): The dataset to validate.
-        num_workers (int): Number of sub-process workers to spawn for the diversity validation.
+        batch_size (int): Number of examples to send to the jax-jit BLEU kernel at one time.
+            A larger batch_size increases throughput, but also uses more memory.
         ngram (int): The maximum n-gram order for BLEU calculation. Default of 3 matches the original paper.
         n_references (Optional[int]): The number of references to sample for each BLEU calculation. Uses all data samples if None.
 
@@ -39,8 +42,6 @@ def diversity_validation(
     if not (isinstance(ngram, int) and ngram > 0):
         raise ValueError(f'ngram must be a positive integer, got: {ngram}')
 
-    _download_nltk_resources()
-
     if isinstance(dataset, AlignmentDataset):
         datasets = [dataset]
     else:
@@ -51,7 +52,7 @@ def diversity_validation(
     results: List[Optional[Dict[str, float]]] = []
     for dataset in datasets:
         if len(dataset):
-            result = _diversity_validation(dataset, num_workers, ngram, n_references)
+            result = _diversity_validation(dataset, ngram, batch_size, n_references)
         else:
             logging.warning(f'Skipping diversity on empty dataset: {dataset}')
             result = None
@@ -61,11 +62,11 @@ def diversity_validation(
 
 def _diversity_validation(
     dataset: AlignmentDataset,
-    num_workers: int,
     ngram: int,
+    batch_size: int,
     n_references: Optional[int],
 ) -> Dict[str, float]:
-    weight = [1.0 / ngram for _ in range(ngram)]
+    weights = [1.0 / ngram for _ in range(ngram)]
     prompts = [sample.prompt for sample in dataset.samples]
     chosens = [sample.chosen for sample in dataset.samples]
     rejected = [sample.rejected for sample in dataset.samples]
@@ -73,76 +74,99 @@ def _diversity_validation(
     results: Dict[str, List[float]] = {}
     logging.info('Computing prompt diversity')
     results['prompt_diversity'] = _compute_diversity(
-        prompts, weight, num_workers, n_references
+        prompts, weights, n_references, batch_size
     )
 
     logging.info('Computing chosen response diversity')
     results['chosen_diversity'] = _compute_diversity(
-        chosens, weight, num_workers, n_references
+        chosens, weights, n_references, batch_size
     )
 
     logging.info('Computing rejected response diversity')
     results['rejected_diversity'] = _compute_diversity(
-        rejected, weight, num_workers, n_references
+        rejected, weights, n_references, batch_size
     )
     return _compute_statistics(results)
 
 
 def _compute_diversity(
     response_set: List[str],
-    weight: List[float],
-    num_workers: int,
+    weights: List[float],
     n_references: Optional[int],
+    batch_size: int,
 ) -> List[float]:
     if 0 <= len(response_set) < 2:
         return len(response_set) * [0.0]
 
-    logging.info('Tokenizing responses')
-    tokenizer = _get_tokenizer()
-    tokenized_responses = [tokenizer(sentence) for sentence in response_set]
+    output: list[float] = []
+    tokens = _tokenize(response_set, min_num_tokens=len(weights))
+    num_valid_seqs = tokens.shape[0]
+    num_batches = ceil(num_valid_seqs / batch_size)
 
-    chunksize = max(len(tokenized_responses) // num_workers, 1)
+    with tqdm.tqdm(
+        total=num_valid_seqs, ncols=75, desc=f'batch size: {batch_size}'
+    ) as _pbar:
+        for _batch_idx in range(num_batches):
+            # Take a different sample of references for each response batch.
+            if n_references is not None:
+                sample_indices = np.random.choice(
+                    list(range(tokens.shape[0])),
+                    size=n_references,
+                )
+                _reference_tokens = tokens[sample_indices, :]
+            else:
+                _reference_tokens = response_set
 
-    with mp.Pool(num_workers) as pool:
-        return [
-            score
-            for score in tqdm.tqdm(
-                pool.imap_unordered(
-                    _diversity_score_wrapper,
-                    [
-                        [tokenized_responses, i, weight, n_references]
-                        for i in range(len(tokenized_responses))
-                    ],
-                    chunksize=chunksize,
-                ),
-                total=len(tokenized_responses),
+            _response_batch = tokens[
+                _batch_idx * batch_size : (_batch_idx + 1) * batch_size,
+                :,
+            ]
+
+            _pbar.set_description(f'{_response_batch.shape}, {_reference_tokens.shape}')
+
+            output.extend(
+                calculate_bleu_similarity(
+                    _response_batch,
+                    _reference_tokens,
+                    pad_token_id=-1,
+                    # n_gram_weights=weights,
+                )
+                .flatten()
+                .tolist(),
             )
-        ]
+            _pbar.update(_response_batch.shape[0])
+
+    return output
 
 
-def _diversity_score_wrapper(args: List[Any]) -> float:
-    return _diversity_score(*args)
+def _tokenize(
+    sentences: list[str], min_num_tokens: int, tokenizer_name='bert-base-uncased'
+) -> np.ndarray:
+    """Tokenize list of sentences.
 
+    Params:
+        sentences: list of N str, one for each sentence
+        min_num_tokens: int, minimum number of tokens in sentence for a sentence
+            to be included.
 
-def _diversity_score(
-    responses: List[str], i: int, weight: List[str], n_references: Optional[int]
-) -> float:
-    if n_references is not None:
-        sample_indices = np.random.choice(
-            [idx for idx in range(len(responses)) if idx != i],
-            size=n_references,
-        )
-        references = [responses[idx] for idx in sample_indices]
-    else:
-        references = responses
+    Returns:
+        np.ndarray: (n, l) where l is the max token supported for the specified tokenizer.
+            n is the number of sentences where num_tokens is at least min_num_tokens.
+    """
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
-    score = sentence_bleu(
-        references,
-        responses[i],
-        weight,
-        smoothing_function=SmoothingFunction().method1,
-    )
-    return 1 - score
+    output = tokenizer(
+        sentences,
+        padding='max_length',
+        return_tensors='np',
+        add_special_tokens=False,
+    ).input_ids
+
+    # Always use -1 as the pad token
+    output = np.where(output != tokenizer.pad_token_type_id, output, -1)
+    rows_included = np.sum(output != -1, axis=-1) >= min_num_tokens
+
+    return output[rows_included]
 
 
 def _compute_statistics(results: Dict[str, List[float]]) -> Dict[str, float]:
@@ -153,10 +177,6 @@ def _compute_statistics(results: Dict[str, List[float]]) -> Dict[str, float]:
         statistics[f'{metric}_min'] = float(np.min(values))
         statistics[f'{metric}_max'] = float(np.max(values))
     return statistics
-
-
-def _get_tokenizer() -> Callable[[str], List[str]]:
-    return nltk.word_tokenize
 
 
 def _download_nltk_resources() -> None:

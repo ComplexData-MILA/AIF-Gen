@@ -51,10 +51,13 @@ from aif_gen.dataset.validation import (
     help='Perform llm judge validation on the dataset.',
 )
 @click.option(
-    '--num-workers',
-    type=click.IntRange(min=1, max=64, clamp=True),
-    help='Number of sub-process workers to spawn for computing diversity validation.',
-    default=os.cpu_count(),
+    '--bleu_batch_size',
+    type=click.IntRange(min=1, clamp=True),
+    help=(
+        'Number BLEU reference examples to process at one time. '
+        'Reduce this value if JAX reports OOM'
+    ),
+    default=256,
 )
 def validate(
     input_data_file: pathlib.Path,
@@ -63,7 +66,7 @@ def validate(
     validate_entropy: bool,
     validate_diversity: bool,
     validate_llm_judge: bool,
-    num_workers: int,
+    bleu_batch_size: int,
 ) -> None:
     r"""Validate a ContinualAlignmentDataset.
 
@@ -87,7 +90,7 @@ def validate(
 
     if validate_diversity:
         logging.info('Performing diversity validation')
-        results['diversity_validation'] = diversity_validation(dataset, num_workers)
+        results['diversity_validation'] = diversity_validation(dataset, bleu_batch_size)
         logging.info('Finished diversity validation')
 
     if validate_llm_judge:

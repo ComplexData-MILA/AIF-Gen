@@ -35,6 +35,6 @@ def setup_basic_logging(
     )
 
     # Disable verbose third-party loggers
-    dependancy_loggers = ['httpx', 'httpcore', 'openai']
+    dependancy_loggers = ['httpx', 'httpcore', 'openai', 'jax']
     for logger_name in dependancy_loggers:
         logging.getLogger(logger_name).setLevel(dependancy_logging_level)
