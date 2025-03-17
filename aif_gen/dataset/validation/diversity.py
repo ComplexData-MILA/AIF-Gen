@@ -10,7 +10,11 @@ from transformers import AutoTokenizer
 
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
 from aif_gen.typing import Dataset
-from aif_gen.dataset.validation.jax_bleu_utils import calculate_bleu_similarity
+from aif_gen.dataset.validation.jax_bleu_utils import (
+    calculate_bleu_similarity,
+    preprocess_for_jax_bleu,
+)
+from nltk.tokenize import word_tokenize
 
 
 def diversity_validation(
@@ -99,7 +103,12 @@ def _compute_diversity(
         return len(response_set) * [0.0]
 
     output: list[float] = []
-    tokens = _tokenize(response_set, min_num_tokens=len(weights))
+    tokens = preprocess_for_jax_bleu(
+        response_set,
+        tokenizer=word_tokenize,
+        max_length=512,
+        min_length=len(weights),
+    )
     num_valid_seqs = tokens.shape[0]
     num_batches = ceil(num_valid_seqs / batch_size)
 
