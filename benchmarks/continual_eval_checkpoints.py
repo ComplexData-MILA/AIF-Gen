@@ -114,6 +114,7 @@ def main(
 
             training_args.output_dir = f'{output_dir}/dataset-{i}'
             # using ContinualDPOTrainer for all pipelines (PPO, DPO, COPR, ..) only for evaluation
+            # ToDo: train_dataset is never used here, pass a dummy dataset to make it clear
             trainer = ContinualDPOTrainer(
                 args=training_args,
                 processing_class=tokenizer,

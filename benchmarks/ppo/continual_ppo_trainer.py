@@ -142,7 +142,7 @@ class ContinualPPOTrainer(PPOTrainer):
             peft_config,
         )
 
-        # No need for anything else as PPO itself is already set up with the reward model
+        # # No need for anything else as PPO itself is already set up with the reward model
         self.accelerator = (
             ContinualPPOTrainer.shared_accelerator
         )  # turn the accelerator back to the shared one
