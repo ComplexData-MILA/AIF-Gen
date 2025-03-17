@@ -43,7 +43,7 @@ def calculate_bleu_similarity(
         # If sentence is too short, return empty fixed-size array
         empty_ngrams = jnp.full((num_ngrams, n), pad_token_id, dtype=sentence.dtype)
 
-        def get_valid_ngrams():
+        def get_valid_ngrams() -> jnp.ndarray:
             # Create indices for sliding windows
             indices = jnp.arange(num_ngrams)[:, None] + jnp.arange(n)[None, :]
             return jnp.take(sentence, indices, axis=0)
@@ -70,15 +70,15 @@ def calculate_bleu_similarity(
         total_valid = jnp.sum(cand_valid_mask)
         total_valid = jnp.maximum(total_valid, 1)  # Avoid division by zero
 
-        def empty_case():
+        def empty_case() -> jnp.ndarray:
             return jnp.array(0.0, dtype=jnp.float32)
 
-        def normal_case():
+        def normal_case() -> jnp.ndarray:
             # Create a counter for clipped counts
             clipped_count_sum = jnp.array(0, dtype=jnp.int32)
 
             # Process each candidate n-gram individually to avoid dynamic shapes
-            def process_ngram(i, acc):
+            def process_ngram(i, acc) -> jnp.ndarray:
                 ngram = cand_ngrams[i]
                 is_valid = cand_valid_mask[i]
 

@@ -1,20 +1,19 @@
 import logging
-from typing import Dict, List, Optional
 from math import ceil
+from typing import Dict, List, Optional
 
 import nltk
 import numpy as np
 import tqdm
+from nltk.tokenize import word_tokenize
 from transformers import AutoTokenizer
 
-
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
-from aif_gen.typing import Dataset
 from aif_gen.dataset.validation.jax_bleu_utils import (
     calculate_bleu_similarity,
     preprocess_for_jax_bleu,
 )
-from nltk.tokenize import word_tokenize
+from aif_gen.typing import Dataset
 
 
 def diversity_validation(
