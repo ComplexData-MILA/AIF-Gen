@@ -1,0 +1,42 @@
+name: "continual_ppo_sweep"
+method: random
+metric:
+  name: eval_loss
+  goal: minimize
+parameters:
+  learning_rate:
+    distribution: uniform
+    min: 1e-7
+    max: 1e-5
+  num_train_epochs:
+    values: [1, 2, 3]
+  per_device_train_batch_size:
+    values: [1, 2, 4]
+  gradient_checkpointing:
+    values: [true, false]
+  eval_steps:
+    values: [50, 100]
+command:
+  - uv run
+  - benchmarks/ppo/ppo_continual.py
+  - --dataset_name
+  - debug
+  - --model_name_or_path
+  - Qwen/Qwen2-0.5B-Instruct
+  - --learning_rate
+  - ${learning_rate}
+  - --num_train_epochs
+  - ${num_train_epochs}
+  - --per_device_train_batch_size
+  - ${per_device_train_batch_size}
+  - --gradient_checkpointing
+  - ${gradient_checkpointing}
+  - --eval_strategy
+  - steps
+  - --eval_steps
+  - ${eval_steps}
+  - --logging_steps
+  - 25
+  - --run_output_dir
+  - Qwen2-0.5B-PPO
+  - --no_remove_unused_columns
