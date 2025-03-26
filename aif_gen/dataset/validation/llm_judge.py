@@ -193,7 +193,7 @@ async def _get_score(
 ) -> Tuple[Optional[float], int, str]:
     try:
 
-        class _ValidationResponse(pydantic.BaseModel, extra='forbid'):  # type: ignore
+        class _ValidationResponse(pydantic.BaseModel, extra='forbid'):
             score: float
 
         async with async_semaphore:
