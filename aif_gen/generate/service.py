@@ -187,10 +187,10 @@ async def _generate_sample(
     """
     try:
 
-        class _PromptProposal(pydantic.BaseModel):
+        class _PromptProposal(pydantic.BaseModel, extra='forbid'):  # type: ignore
             prompt: str
 
-        class _ResponsePair(pydantic.BaseModel):
+        class _ResponsePair(pydantic.BaseModel, extra='forbid'):  # type: ignore
             chosen: str
             rejected: str
 
