@@ -123,4 +123,4 @@ def generate(
         logging.info(f'Wrote {len(dataset)} samples to {output_file}')
 
         if hf_repo_id is not None:
-            upload_to_hf(repo_id=hf_repo_id, local_path=output_file.parent)
+            upload_to_hf(repo_id=hf_repo_id, local_path=output_file)
