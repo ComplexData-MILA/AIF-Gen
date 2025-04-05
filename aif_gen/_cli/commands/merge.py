@@ -47,4 +47,4 @@ def merge() -> None:
     path = click.prompt('> Path to save merged dataset')
     click.echo(f'Writing dataset to: {path}')
     dataset.to_json(path)
-    click.secho(f'Wrote {len(dataset)} sampled to: {path}', fg='green')
+    click.secho(f'Wrote {len(dataset)} samples to: {path}', fg='green')
