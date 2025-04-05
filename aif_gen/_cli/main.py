@@ -3,6 +3,7 @@ import pathlib
 import click
 
 from aif_gen._cli.commands.generate import generate
+from aif_gen._cli.commands.merge import merge
 from aif_gen._cli.commands.preview import preview
 from aif_gen._cli.commands.transform import transform
 from aif_gen._cli.commands.validate import validate
@@ -36,6 +37,7 @@ def cli(log_file: pathlib.Path) -> None:
 cli.add_command(generate)
 cli.add_command(validate)
 cli.add_command(preview)
+cli.add_command(merge)
 cli.add_command(transform)
 
 if __name__ == '__main__':
