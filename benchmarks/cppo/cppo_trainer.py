@@ -473,11 +473,16 @@ class CPPOTrainer(PPOTrainer):
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
     
     def detect_track(self, old_logprobs, old_rewards, mask):
-        """
-        old_logprobs : [B, response_size]
-        old_rewards : [B, response_size]
-        """
+        """Detect track for CPPO.
 
+        Args:
+            old_logprobs (Tensor): [B, response_size] tensor of old log probabilities.
+            old_rewards (Tensor): [B, response_size] tensor of old rewards.
+            mask (Tensor): Mask tensor indicating valid positions.
+
+        Returns:
+            Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
+        """
         assert len(old_rewards.shape) == 2
 
         # logP_mean = stats["old_logP/mean"]
