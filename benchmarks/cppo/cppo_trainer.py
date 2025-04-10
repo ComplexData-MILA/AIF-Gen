@@ -471,7 +471,7 @@ class CPPOTrainer(PPOTrainer):
 
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
-    
+
     def detect_track(self, old_logprobs, old_rewards, mask):
         """Detect track for CPPO.
 
@@ -507,36 +507,68 @@ class CPPOTrainer(PPOTrainer):
         threhold21 = (logp_mean + self.threhold * logp_std).to(device)
         threhold22 = (logp_mean - self.threhold * logp_std).to(device)
 
-        cond11 = torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threhold11
-        cond12 = torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threhold12
+        cond11 = (
+            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threhold11
+        )
+        cond12 = (
+            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threhold12
+        )
 
         cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threhold21
         cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threhold22
 
-        if "linear" in self.abl_type:
+        if 'linear' in self.abl_type:
             for i in range(N):
                 if cond11[i]:
                     if cond21[i]:  # high retention & high learning
-                        coff_learn[i] = min((old_logprobs[i, lenth[i]] - logp_mean) / logp_std + 1 - self.threhold,
-                                            self.ub)
-                        coff_reg[i] = min((old_rewards[i, lenth[i]] - rewards_mean) / rewards_std + 1 - self.threhold,
-                                          self.ub)
+                        coff_learn[i] = min(
+                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
+                            + 1
+                            - self.threhold,
+                            self.ub,
+                        )
+                        coff_reg[i] = min(
+                            (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std
+                            + 1
+                            - self.threhold,
+                            self.ub,
+                        )
                     elif cond22[i]:  # normal retention & high learning
-                        coff_learn[i] = min((old_logprobs[i, lenth[i]] - logp_mean) / logp_std + 1 - self.threhold,
-                                            self.ub)
+                        coff_learn[i] = min(
+                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
+                            + 1
+                            - self.threhold,
+                            self.ub,
+                        )
                         # coff_reg[i] = 0.2
                 elif cond12[i]:
                     if cond21[i]:  # low retention & high learning
-                        coff_learn[i] = min((old_logprobs[i, lenth[i]] - logp_mean) / logp_std + 1 - self.threhold,
-                                            self.ub)
-                        coff_reg[i] = max(1 + self.threhold + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
-                                          self.lb)
+                        coff_learn[i] = min(
+                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
+                            + 1
+                            - self.threhold,
+                            self.ub,
+                        )
+                        coff_reg[i] = max(
+                            1
+                            + self.threhold
+                            + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
+                            self.lb,
+                        )
                     elif cond22[i]:  # low retention & low Learning
-                        coff_learn[i] = max(1 + self.threhold + (old_logprobs[i, lenth[i]] - logp_std) / rewards_std,
-                                            0.5)
-                        coff_reg[i] = max(1 + self.threhold + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
-                                          self.lb)
-        elif "balance" in self.abl_type:
+                        coff_learn[i] = max(
+                            1
+                            + self.threhold
+                            + (old_logprobs[i, lenth[i]] - logp_std) / rewards_std,
+                            0.5,
+                        )
+                        coff_reg[i] = max(
+                            1
+                            + self.threhold
+                            + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
+                            self.lb,
+                        )
+        elif 'balance' in self.abl_type:
             for i in range(N):
                 if cond11[i]:
                     if cond21[i]:  # high retention & high learning
@@ -553,20 +585,20 @@ class CPPOTrainer(PPOTrainer):
                     elif cond22[i]:  # low retention & low Learning
                         coff_learn[i] = self.lb
                         coff_reg[i] = self.lb
-        
+
         #############################################
         ### 为了解决重复问题设置的特殊CPPO
-        elif "repeat" in self.abl_type:
+        elif 'repeat' in self.abl_type:
             for i in range(N):
-                if cond11[i]: # reward 大
+                if cond11[i]:  # reward 大
                     if cond21[i]:  # high retention & high learning
                         coff_learn[i] = self.ub
                         coff_reg[i] = self.ub
                     elif cond22[i]:  # normal retention & high learning
                         coff_learn[i] = self.ub
-                elif cond12[i]: # reward 小
-                        coff_learn[i] = self.lb
-                        coff_reg[i] = self.lb
+                elif cond12[i]:  # reward 小
+                    coff_learn[i] = self.lb
+                    coff_reg[i] = self.lb
         #############################################
 
         else:  # constant
@@ -590,13 +622,13 @@ class CPPOTrainer(PPOTrainer):
         coff_reg = coff_reg.to(device)
 
         if self.abl_type is not None:
-            if self.abl_type == "alpha":
+            if self.abl_type == 'alpha':
                 for i in range(N):
                     coff_learn[i] = 1.0
-            if self.abl_type == "beta":
+            if self.abl_type == 'beta':
                 for i in range(N):
                     coff_reg[i] = 1.0
-            if self.abl_type == "beta2":
+            if self.abl_type == 'beta2':
                 for i in range(N):
                     coff_reg[i] = 0.0
 
@@ -721,7 +753,11 @@ class CPPOTrainer(PPOTrainer):
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     logprob = selective_log_softmax(logits, response)
-                    tensor_mask = response.ne(processing_class.pad_token_id).long().to(accelerator.device) # portion of mask for single tensor
+                    tensor_mask = (
+                        response.ne(processing_class.pad_token_id)
+                        .long()
+                        .to(accelerator.device)
+                    )  # portion of mask for single tensor
                     del logits
                     torch.cuda.empty_cache()
 
@@ -783,7 +819,7 @@ class CPPOTrainer(PPOTrainer):
                     sequence_lengths.append(sequence_length)
                     scores.append(score)
                     values.append(value)
-                
+
                 responses = torch.cat(responses, 0)
                 postprocessed_responses = torch.cat(postprocessed_responses, 0)
                 logprobs = torch.cat(logprobs, 0)
@@ -793,7 +829,9 @@ class CPPOTrainer(PPOTrainer):
                 values = torch.cat(values, 0)
 
                 # CPPO
-                coff_learn, coff_reg = self.detect_track(old_logprobs, old_rewards, mask)
+                coff_learn, coff_reg = self.detect_track(
+                    old_logprobs, old_rewards, mask
+                )
 
                 del (logprob, full_value, value, score)
                 torch.cuda.empty_cache()
@@ -906,8 +944,12 @@ class CPPOTrainer(PPOTrainer):
                                 mb_values + args.cliprange_value,
                             )
 
-                            mask_alpha = torch.matmul(torch.diag(coff_learn), mask.to(coff_learn.dtype))
-                            mask_beta = torch.matmul(torch.diag(coff_reg), mask.to(coff_learn.dtype))
+                            mask_alpha = torch.matmul(
+                                torch.diag(coff_learn), mask.to(coff_learn.dtype)
+                            )
+                            mask_beta = torch.matmul(
+                                torch.diag(coff_reg), mask.to(coff_learn.dtype)
+                            )
 
                             n_alpha = mask_alpha.sum()
                             n_beta = mask_beta.sum()
@@ -921,27 +963,54 @@ class CPPOTrainer(PPOTrainer):
                             # Value function loss with clip
                             vf_loss1 = (vpred - mb_return) ** 2
                             vf_loss2 = (values_clipped - mb_return) ** 2
-                            vf_loss = 0.5 * torch.sum(torch.max(vf_loss1, vf_loss2) * mask_alpha) / mask_alpha.sum()
-                            vf_clipfrac = torch.sum((vf_loss2 > vf_loss1).float() * mask_alpha) / mask_alpha.sum()
+                            vf_loss = (
+                                0.5
+                                * torch.sum(torch.max(vf_loss1, vf_loss2) * mask_alpha)
+                                / mask_alpha.sum()
+                            )
+                            vf_clipfrac = (
+                                torch.sum((vf_loss2 > vf_loss1).float() * mask_alpha)
+                                / mask_alpha.sum()
+                            )
 
                             # Policy loss
                             logprobs_diff = new_logprobs - mb_logprobs
                             ratio = torch.exp(logprobs_diff * mask)
                             pg_loss1 = -mb_advantage * ratio
-                            pg_loss2 = -mb_advantage * torch.clamp(ratio, 1.0 - args.cliprange, 1.0 + args.cliprange)
-                            pg_loss = torch.sum(torch.max(pg_loss1, pg_loss2) * mask_alpha) / mask_alpha.sum()
-                            pg_clipfrac = torch.sum((pg_loss2 > pg_loss1).float() * mask_alpha) / mask_alpha.sum()
+                            pg_loss2 = -mb_advantage * torch.clamp(
+                                ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
+                            )
+                            pg_loss = (
+                                torch.sum(torch.max(pg_loss1, pg_loss2) * mask_alpha)
+                                / mask_alpha.sum()
+                            )
+                            pg_clipfrac = (
+                                torch.sum((pg_loss2 > pg_loss1).float() * mask_alpha)
+                                / mask_alpha.sum()
+                            )
 
                             # Optional: L2 Regularization between logprobs
-                            if "norm" in self.abl_type:
-                                norm_logprobs = logprobs_diff / logprobs_diff.norm(dim=-1, keepdim=True)
-                                norm_old = mb_logprobs / mb_logprobs.norm(dim=-1, keepdim=True)
-                                l2_loss = ((norm_logprobs - norm_old).square() * mask_beta).sum() / mask_beta.sum()
+                            if 'norm' in self.abl_type:
+                                norm_logprobs = logprobs_diff / logprobs_diff.norm(
+                                    dim=-1, keepdim=True
+                                )
+                                norm_old = mb_logprobs / mb_logprobs.norm(
+                                    dim=-1, keepdim=True
+                                )
+                                l2_loss = (
+                                    (norm_logprobs - norm_old).square() * mask_beta
+                                ).sum() / mask_beta.sum()
                             else:
-                                l2_loss = ((logprobs_diff).square() * mask_beta).sum() / mask_beta.sum()
+                                l2_loss = (
+                                    (logprobs_diff).square() * mask_beta
+                                ).sum() / mask_beta.sum()
 
                             # Total CPPO loss
-                            loss = pg_loss + args.vf_coef * vf_loss + args.reg_coef * l2_loss
+                            loss = (
+                                pg_loss
+                                + args.vf_coef * vf_loss
+                                + args.reg_coef * l2_loss
+                            )
 
                             accelerator.backward(loss)
                             optimizer.step()
@@ -949,19 +1018,33 @@ class CPPOTrainer(PPOTrainer):
 
                             # KL estimate (optional for logging)
                             with torch.no_grad():
-                                approxkl = torch.mean((ratio - 1) - logprobs_diff * mask)
+                                approxkl = torch.mean(
+                                    (ratio - 1) - logprobs_diff * mask
+                                )
                                 prob_dist = torch.nn.functional.softmax(logits, dim=-1)
                                 entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
                                     prob_dist * logits, dim=-1
                                 )
-                            
-                            pg_clipfrac_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = pg_clipfrac
-                            pg_loss_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = pg_loss
-                            vf_loss_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = vf_loss
-                            vf_clipfrac_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = vf_clipfrac
-                            ratio_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = ratio.mean()
-                            entropy_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = entropy.mean()
-                            
+
+                            pg_clipfrac_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = pg_clipfrac
+                            pg_loss_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = pg_loss
+                            vf_loss_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = vf_loss
+                            vf_clipfrac_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = vf_clipfrac
+                            ratio_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = ratio.mean()
+                            entropy_stats[
+                                ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx
+                            ] = entropy.mean()
+
                         gradient_accumulation_idx += 1
                     minibatch_idx += 1
                     # del everything and empty cache
@@ -1071,7 +1154,7 @@ class CPPOTrainer(PPOTrainer):
                 query_responses,
                 responses,
                 postprocessed_responses,
-                logprobs, # could potentially keep this **resource-intensive?
+                logprobs,  # could potentially keep this **resource-intensive?
                 values,
                 sequence_lengths,
                 contain_eos_token,
