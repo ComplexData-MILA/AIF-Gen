@@ -687,7 +687,9 @@ class CPPOTrainer(PPOTrainer):
                 responses: Union[List[Tensor], Tensor] = []
                 postprocessed_responses: Union[List[Tensor], Tensor] = []
                 logprobs: Union[List[Tensor], Tensor] = []
-                ref_logprobs: Union[List[Tensor], Tensor] = []
+                mask: Union[List[Tensor], Tensor] = []
+                old_logprobs: Union[List[Tensor], Tensor] = []
+                old_rewards: Union[List[Tensor], Tensor] = []
                 scores: Union[List[Tensor], Tensor] = []
                 sequence_lengths: Union[List[Tensor], Tensor] = []
                 values: Union[List[Tensor], Tensor] = []
@@ -714,6 +716,7 @@ class CPPOTrainer(PPOTrainer):
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     logprob = selective_log_softmax(logits, response)
+                    tensor_mask = response.ne(processing_class.pad_token_id).long().to(accelerator.device) # portion of mask for single tensor
                     del logits
                     torch.cuda.empty_cache()
 
@@ -770,10 +773,12 @@ class CPPOTrainer(PPOTrainer):
                     responses.append(response)
                     postprocessed_responses.append(postprocessed_response)
                     logprobs.append(logprob)
+                    # mask.append(tensor_mask)
                     ref_logprobs.append(ref_logprob)
                     sequence_lengths.append(sequence_length)
                     scores.append(score)
                     values.append(value)
+                
                 responses = torch.cat(responses, 0)
                 postprocessed_responses = torch.cat(postprocessed_responses, 0)
                 logprobs = torch.cat(logprobs, 0)
@@ -781,11 +786,16 @@ class CPPOTrainer(PPOTrainer):
                 sequence_lengths = torch.cat(sequence_lengths, 0)
                 scores = torch.cat(scores, 0)
                 values = torch.cat(values, 0)
+
+                # CPPO
+                coff_learn, coff_reg = self.detect_track(old_logprobs, old_rewards, mask)
+
                 del (logprob, full_value, value, score)
                 torch.cuda.empty_cache()
                 gc.collect()
 
-                # Response Processing 3. Filter completion. Ensure that the sample contains stop_token_id
+                # Response Processing
+                # 3. Filter completion. Ensure that the sample contains stop_token_id
                 # Completions not passing that filter will receive a lower score.
                 contain_eos_token = torch.any(
                     postprocessed_responses == self.processing_class.eos_token_id,
@@ -883,92 +893,83 @@ class CPPOTrainer(PPOTrainer):
                             vpred = torch.masked_fill(
                                 vpred, padding_mask_p1[micro_batch_inds], 0
                             )
-                            vpredclipped = torch.clamp(
+                            mask = ~padding_mask[micro_batch_inds]
+
+                            values_clipped = torch.clamp(
                                 vpred,
                                 mb_values - args.cliprange_value,
                                 mb_values + args.cliprange_value,
                             )
-                            vf_losses1 = torch.square(vpred - mb_return)
-                            vf_losses2 = torch.square(vpredclipped - mb_return)
-                            vf_loss_max = torch.max(vf_losses1, vf_losses2)
-                            vf_loss = 0.5 * masked_mean(
-                                vf_loss_max, ~padding_mask_p1[micro_batch_inds]
-                            )
-                            vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(),
-                                ~padding_mask_p1[micro_batch_inds],
-                            )
+
+                            mask_alpha = torch.matmul(torch.diag(coff_learn), mask.to(coff_learn.dtype))
+                            mask_beta = torch.matmul(torch.diag(coff_reg), mask.to(coff_learn.dtype))
+
+                            n_alpha = mask_alpha.sum()
+                            n_beta = mask_beta.sum()
+
+                            # Fallback if all-zero masks
+                            if n_alpha == 0:
+                                mask_alpha = mask
+                            if n_beta == 0:
+                                mask_beta = mask
+
+                            # Value function loss with clip
+                            vf_loss1 = (vpred - mb_return) ** 2
+                            vf_loss2 = (values_clipped - mb_return) ** 2
+                            vf_loss = 0.5 * torch.sum(torch.max(vf_loss1, vf_loss2) * mask_alpha) / mask_alpha.sum()
+                            vf_clipfrac = torch.sum((vf_loss2 > vf_loss1).float() * mask_alpha) / mask_alpha.sum()
+
+                            # Policy loss
                             logprobs_diff = new_logprobs - mb_logprobs
-                            ratio = torch.exp(logprobs_diff)
-                            pg_losses = -mb_advantage * ratio
-                            pg_losses2 = -mb_advantage * torch.clamp(
-                                ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
-                            )
-                            pg_loss_max = torch.max(pg_losses, pg_losses2)
-                            pg_loss = masked_mean(
-                                pg_loss_max, ~padding_mask[micro_batch_inds]
-                            )
-                            loss = pg_loss + args.vf_coef * vf_loss
+                            ratio = torch.exp(logprobs_diff * mask)
+                            pg_loss1 = -mb_advantage * ratio
+                            pg_loss2 = -mb_advantage * torch.clamp(ratio, 1.0 - args.cliprange, 1.0 + args.cliprange)
+                            pg_loss = torch.sum(torch.max(pg_loss1, pg_loss2) * mask_alpha) / mask_alpha.sum()
+                            pg_clipfrac = torch.sum((pg_loss2 > pg_loss1).float() * mask_alpha) / mask_alpha.sum()
+
+                            # Optional: L2 Regularization between logprobs
+                            if "norm" in self.abl_type:
+                                norm_logprobs = logprobs_diff / logprobs_diff.norm(dim=-1, keepdim=True)
+                                norm_old = mb_logprobs / mb_logprobs.norm(dim=-1, keepdim=True)
+                                l2_loss = ((norm_logprobs - norm_old).square() * mask_beta).sum() / mask_beta.sum()
+                            else:
+                                l2_loss = ((logprobs_diff).square() * mask_beta).sum() / mask_beta.sum()
+
+                            # Total CPPO loss
+                            loss = pg_loss + args.vf_coef * vf_loss + args.reg_coef * l2_loss
+
                             accelerator.backward(loss)
                             optimizer.step()
                             optimizer.zero_grad()
+
+                            # KL estimate (optional for logging)
                             with torch.no_grad():
-                                pg_clipfrac = masked_mean(
-                                    (pg_losses2 > pg_losses).float(),
-                                    ~padding_mask[micro_batch_inds],
-                                )
+                                approxkl = torch.mean((ratio - 1) - logprobs_diff * mask)
                                 prob_dist = torch.nn.functional.softmax(logits, dim=-1)
                                 entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
                                     prob_dist * logits, dim=-1
                                 )
-                                approxkl = 0.5 * (logprobs_diff**2).mean()
-                                approxkl_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = approxkl
-                                pg_clipfrac_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = pg_clipfrac
-                                pg_loss_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = pg_loss
-                                vf_loss_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = vf_loss
-                                vf_clipfrac_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = vf_clipfrac
-                                entropy_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = entropy.mean()
-                                ratio_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = ratio.mean()
+                            
+                            pg_clipfrac_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = pg_clipfrac
+                            pg_loss_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = pg_loss
+                            vf_loss_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = vf_loss
+                            vf_clipfrac_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = vf_clipfrac
+                            ratio_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = ratio.mean()
+                            entropy_stats[ppo_epoch_idx, minibatch_idx, gradient_accumulation_idx] = entropy.mean()
+                            
                         gradient_accumulation_idx += 1
                     minibatch_idx += 1
                     # del everything and empty cache
                     # fmt: off
                     del (
-                        output, vpred_temp, logits, new_logprobs, vpred, vpredclipped,
-                        vf_losses1, vf_losses2, vf_loss, vf_clipfrac, logprobs_diff, ratio, pg_losses, pg_losses2, pg_loss_max,
-                        pg_loss, loss, pg_clipfrac, prob_dist, entropy, approxkl, mb_return,
+                        output, vpred_temp, logits, new_logprobs, vpred, vf_loss1, vf_loss2,
+                        vf_loss, vf_clipfrac, logprobs_diff, ratio, pg_loss1, pg_loss2,
+                        pg_loss, loss, pg_clipfrac, approxkl, mb_return,
                         mb_advantage, mb_values, mb_responses, mb_query_responses, mb_logprobs,
                     )
                     # fmt: on
                     torch.cuda.empty_cache()
+
             with torch.no_grad():
                 mean_kl = kl.sum(1).mean()
                 mean_entropy = (-logprobs).sum(1).mean()
