@@ -6,12 +6,11 @@ from typing import Optional
 import click
 import openai
 
-from aif_gen.generate.service import transmute_continual_dataset
-from aif_gen.input_dataset.continual_alignment_dataset import (
+from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )
+from aif_gen.generate.service import transmute_continual_dataset
 from aif_gen.util.hf import download_from_hf, upload_to_hf
-from aif_gen.util.path import get_run_id
 from aif_gen.util.seed import seed_everything
 
 
@@ -21,15 +20,12 @@ from aif_gen.util.seed import seed_everything
     type=click.Path(exists=True, dir_okay=False, path_type=pathlib.Path),
 )
 @click.argument(
+    'output_data_file',
+    type=click.Path(dir_okay=False, path_type=pathlib.Path),
+)
+@click.argument(
     'model',
     type=click.STRING,
-)
-@click.argument(context_settings={'show_default': True})
-@click.option(
-    '--output_file',
-    type=click.Path(dir_okay=False, path_type=pathlib.Path),
-    help='Path to write the generated input_dataset.',
-    default=lambda: f'data/{get_run_id(name=click.get_current_context().params["data_config_name"].stem)}/data.json',
 )
 @click.option(
     '--max_concurrency',
@@ -64,8 +60,8 @@ from aif_gen.util.seed import seed_everything
 )
 def transmute(
     input_data_file: pathlib.Path,
+    output_data_file: pathlib.Path,
     model: str,
-    output_file: pathlib.Path,
     max_concurrency: int,
     max_tokens_chosen_rejected_response: int,
     random_seed: int,
@@ -74,7 +70,8 @@ def transmute(
 ) -> None:
     r"""Transmute a new ContinualAlignmentDataset.
 
-    INPUT_DATA_FILE: Path to the input input_dataset.
+    INPUT_DATA_FILE: Path to the input dataset.
+    OUTPUT_DATA_FILE: Path to the output dataset.
     MODEL: vLLM-compatible model to use for data generation.
     """
     if hf_repo_id is not None:
@@ -92,7 +89,7 @@ def transmute(
     logging.info(f'Random seed: {random_seed}')
     seed_everything(random_seed)
 
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_data_file.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         client = openai.AsyncOpenAI()
@@ -111,9 +108,9 @@ def transmute(
     )
     dataset = asyncio.get_event_loop().run_until_complete(future)
     if dataset is not None:
-        logging.info(f'Writing {len(dataset)} samples to {output_file}')
-        dataset.to_json(output_file)
-        logging.info(f'Wrote {len(dataset)} samples to {output_file}')
+        logging.info(f'Writing {len(dataset)} samples to {output_data_file}')
+        dataset.to_json(output_data_file)
+        logging.info(f'Wrote {len(dataset)} samples to {output_data_file}')
 
         if hf_repo_id is not None:
-            upload_to_hf(repo_id=hf_repo_id, local_path=output_file)
+            upload_to_hf(repo_id=hf_repo_id, local_path=output_data_file)
