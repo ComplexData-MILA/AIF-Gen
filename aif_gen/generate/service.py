@@ -371,7 +371,8 @@ async def transmute_continual_dataset(
                 logging.warning(
                     f'Dataset {i} requested {dataset_sizes[i]} samples but LM generated {len(samples[i])}'
                 )
-            continual_dataset.append(AlignmentDataset(tasks[i], samples[i]))
+            train_frac = input_dataset.datasets[i].train_frac
+            continual_dataset.append(AlignmentDataset(tasks[i], samples[i], train_frac))
         return continual_dataset
     except BaseException as e:
         logging.exception(f'Exception occured while generating dataset: {e}')
