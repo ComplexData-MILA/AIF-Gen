@@ -7,6 +7,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
+import copy
 
 import numpy as np
 import torch
@@ -119,6 +120,9 @@ class CPPOTrainer(PPOTrainer):
     policy_value_models: Any  # the policy and value model wrapper
     ds_wrapped_models: Any  # TODO work with this after deepspeed is initialized
     accelerator: Accelerator  # now non-optional after creation
+    old_logprobs: Optional[Union[List[Tensor], Tensor]] = []
+    old_rewards: Optional[Union[List[Tensor], Tensor]] = []
+    ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
 
     def __init__(
         self,
@@ -243,7 +247,16 @@ class CPPOTrainer(PPOTrainer):
 
         else:
             # For subsequent tasks, reuse the reference model
-            self.ref_model = CPPOTrainer.class_ref_model
+            core_model = self.policy_value_models
+            if hasattr(core_model, 'policy'):
+                core_model = core_model.policy
+            elif hasattr(core_model, 'model'):
+                core_model = core_model.model
+            elif hasattr(core_model, 'policy_model'):
+                core_model = core_model.policy_model
+            else:
+                raise ValueError("No policy attribute found - will not be able to generate")
+            self.ref_model = copy.deepcopy(core_model)
 
         # Always process new datasets for each task
         self.reward_model = reward_model
@@ -731,8 +744,6 @@ class CPPOTrainer(PPOTrainer):
                 postprocessed_responses: Union[List[Tensor], Tensor] = []
                 logprobs: Union[List[Tensor], Tensor] = []
                 mask: Union[List[Tensor], Tensor] = []
-                old_logprobs: Union[List[Tensor], Tensor] = []
-                old_rewards: Union[List[Tensor], Tensor] = []
                 ref_logprobs: Union[List[Tensor], Tensor] = []
                 scores: Union[List[Tensor], Tensor] = []
                 sequence_lengths: Union[List[Tensor], Tensor] = []
@@ -837,7 +848,7 @@ class CPPOTrainer(PPOTrainer):
 
                 # CPPO
                 coff_learn, coff_reg = self.detect_track(
-                    old_logprobs, old_rewards, mask
+                    self.old_logprobs, self.old_rewards, mask
                 )
 
                 del (logprob, full_value, value, score)
@@ -901,7 +912,7 @@ class CPPOTrainer(PPOTrainer):
                 advantages = torch.masked_fill(advantages, padding_mask, 0)
                 torch.cuda.empty_cache()
 
-            # Do multiple epochs of PPO training, with a fresh random shuffle in each epoch
+            # Do multiple epochs of CPPO training, with a fresh random shuffle in each epoch
             for ppo_epoch_idx in range(args.num_ppo_epochs):
                 b_inds = np.random.permutation(args.local_batch_size)
                 minibatch_idx = 0

@@ -2,6 +2,7 @@
 
 import os
 
+import gc
 import torch
 import wandb as wb
 from cppo_trainer import CPPOArguments, CPPOConfig, CPPOTrainer
@@ -171,6 +172,10 @@ def main(
                 model_name=custom_repo_name,
                 dataset_name='CPPO_' + clean_dataset_name + '_' + str(i),
             )
+        
+        del ref_policy
+        gc.collect()
+        torch.cuda.empty_cache()
 
     print('Training completed for all tasks!')
 
