@@ -3,11 +3,8 @@
 import os
 
 import torch
-from cppo_trainer import (
-    CPPOArguments,
-    CPPOConfig,
-    CPPOTrainer,
-)
+import wandb as wb
+from cppo_trainer import CPPOArguments, CPPOConfig, CPPOTrainer
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -23,7 +20,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 
 
@@ -118,7 +114,7 @@ def main(
     for i, dataset in enumerate(continual_dataset):
         # Build custom repository name for this task
         custom_repo_name = (
-            model.split('/')[-1] + '_' + clean_dataset_name + '_PPO_' + str(i)
+            model.split('/')[-1] + '_' + clean_dataset_name + '_CPPO_' + str(i)
         )
         if training_args.push_to_hub:
             training_args.hub_model_id = custom_repo_name
@@ -139,7 +135,6 @@ def main(
             ref_model=ref_policy,
             reward_model=reward_model,
             value_model=value_model,
-            tokenizer=tokenizer,
             train_dataset=dataset[script_args.dataset_train_split],
             eval_dataset=dataset[script_args.dataset_test_split],
             peft_config=peft_config,
@@ -165,8 +160,8 @@ def main(
             trainer.save_metrics('eval', metrics)
 
             # Log metrics to WandB
-            wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
-            wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
+            wb.log({'eval': {'last': metrics}})
+            wb.log({f'task/{custom_repo_name}/last': metrics})
 
         # Save model checkpoint and optionally push
         if not training_args.push_to_hub:
@@ -174,7 +169,7 @@ def main(
         else:
             trainer.push_to_hub(
                 model_name=custom_repo_name,
-                dataset_name='Continual_PPO_' + clean_dataset_name + '_' + str(i),
+                dataset_name='CPPO_' + clean_dataset_name + '_' + str(i),
             )
 
     print('Training completed for all tasks!')

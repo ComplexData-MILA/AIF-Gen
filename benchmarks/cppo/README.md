@@ -13,7 +13,7 @@ uv sync --group benchmarks.cppo
 ### Using uv run (vanilla Python with PEFT)
 
 ```sh
-uv run benchmarks/cppo/cppo_continual.py \
+uv run benchmarks/cppo/cppo.py \
     --dataset_name benchmarks/continual_data_debug.json \
     --sft_model_path Qwen/Qwen2-0.5B-Instruct \
     --value_model_path Shahradmz/Qwen2-0.5B-Instruct_continual_data_debug_REWARD_0 \

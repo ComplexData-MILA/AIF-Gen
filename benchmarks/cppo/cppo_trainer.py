@@ -40,7 +40,7 @@ from transformers.trainer_callback import (
 )
 from transformers.utils import is_peft_available
 from trl import ScriptArguments
-from trl.core import masked_mean, masked_whiten
+from trl.core import masked_whiten
 from trl.models import create_reference_model
 from trl.trainer.ppo_config import PPOConfig
 from trl.trainer.ppo_trainer import (
@@ -472,7 +472,9 @@ class CPPOTrainer(PPOTrainer):
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
 
-    def detect_track(self, old_logprobs, old_rewards, mask):
+    def detect_track(
+        self, old_logprobs: Tensor, old_rewards: Tensor, mask: Tensor
+    ) -> tuple[Tensor, Tensor]:
         """Detect track for CPPO.
 
         Args:
@@ -483,6 +485,12 @@ class CPPOTrainer(PPOTrainer):
         Returns:
             Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
         """
+        # Initialize coefficients for learning and regularization
+        self.threshold = 0.5  # Threshold for detection
+        self.ub = 2.0  # Upper bound
+        self.lb = 0.2  # Lower bound
+        self.abl_type = 'balance'  # Default ablation type
+
         assert len(old_rewards.shape) == 2
 
         # logP_mean = stats["old_logP/mean"]
@@ -502,20 +510,20 @@ class CPPOTrainer(PPOTrainer):
 
         lenth = mask.sum(dim=-1) - 1
 
-        threhold11 = (rewards_mean + self.threhold * rewards_std).to(device)
-        threhold12 = (rewards_mean - self.threhold * rewards_std).to(device)
-        threhold21 = (logp_mean + self.threhold * logp_std).to(device)
-        threhold22 = (logp_mean - self.threhold * logp_std).to(device)
+        threshold11 = (rewards_mean + self.threshold * rewards_std).to(device)
+        threshold12 = (rewards_mean - self.threshold * rewards_std).to(device)
+        threshold21 = (logp_mean + self.threshold * logp_std).to(device)
+        threshold22 = (logp_mean - self.threshold * logp_std).to(device)
 
         cond11 = (
-            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threhold11
+            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threshold11
         )
         cond12 = (
-            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threhold12
+            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threshold12
         )
 
-        cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threhold21
-        cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threhold22
+        cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
+        cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
 
         if 'linear' in self.abl_type:
             for i in range(N):
@@ -524,20 +532,20 @@ class CPPOTrainer(PPOTrainer):
                         coff_learn[i] = min(
                             (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
                             + 1
-                            - self.threhold,
+                            - self.threshold,
                             self.ub,
                         )
                         coff_reg[i] = min(
                             (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std
                             + 1
-                            - self.threhold,
+                            - self.threshold,
                             self.ub,
                         )
                     elif cond22[i]:  # normal retention & high learning
                         coff_learn[i] = min(
                             (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
                             + 1
-                            - self.threhold,
+                            - self.threshold,
                             self.ub,
                         )
                         # coff_reg[i] = 0.2
@@ -546,25 +554,25 @@ class CPPOTrainer(PPOTrainer):
                         coff_learn[i] = min(
                             (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
                             + 1
-                            - self.threhold,
+                            - self.threshold,
                             self.ub,
                         )
                         coff_reg[i] = max(
                             1
-                            + self.threhold
+                            + self.threshold
                             + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
                             self.lb,
                         )
                     elif cond22[i]:  # low retention & low Learning
                         coff_learn[i] = max(
                             1
-                            + self.threhold
+                            + self.threshold
                             + (old_logprobs[i, lenth[i]] - logp_std) / rewards_std,
                             0.5,
                         )
                         coff_reg[i] = max(
                             1
-                            + self.threhold
+                            + self.threshold
                             + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
                             self.lb,
                         )
@@ -577,7 +585,7 @@ class CPPOTrainer(PPOTrainer):
                     elif cond22[i]:  # normal retention & high learning
                         coff_learn[i] = self.ub
                         # TODO: review meaning of this
-                        # coff_reg[i] = self.lb
+                        coff_reg[i] = self.lb
                 elif cond12[i]:
                     if cond21[i]:  # low retention & high learning
                         coff_learn[i] = self.ub
@@ -586,17 +594,15 @@ class CPPOTrainer(PPOTrainer):
                         coff_learn[i] = self.lb
                         coff_reg[i] = self.lb
 
-        #############################################
-        ### 为了解决重复问题设置的特殊CPPO
         elif 'repeat' in self.abl_type:
             for i in range(N):
-                if cond11[i]:  # reward 大
+                if cond11[i]:  # reward
                     if cond21[i]:  # high retention & high learning
                         coff_learn[i] = self.ub
                         coff_reg[i] = self.ub
                     elif cond22[i]:  # normal retention & high learning
                         coff_learn[i] = self.ub
-                elif cond12[i]:  # reward 小
+                elif cond12[i]:  # reward
                     coff_learn[i] = self.lb
                     coff_reg[i] = self.lb
         #############################################
@@ -727,6 +733,7 @@ class CPPOTrainer(PPOTrainer):
                 mask: Union[List[Tensor], Tensor] = []
                 old_logprobs: Union[List[Tensor], Tensor] = []
                 old_rewards: Union[List[Tensor], Tensor] = []
+                ref_logprobs: Union[List[Tensor], Tensor] = []
                 scores: Union[List[Tensor], Tensor] = []
                 sequence_lengths: Union[List[Tensor], Tensor] = []
                 values: Union[List[Tensor], Tensor] = []
@@ -814,7 +821,7 @@ class CPPOTrainer(PPOTrainer):
                     responses.append(response)
                     postprocessed_responses.append(postprocessed_response)
                     logprobs.append(logprob)
-                    # mask.append(tensor_mask)
+                    mask.append(tensor_mask)
                     ref_logprobs.append(ref_logprob)
                     sequence_lengths.append(sequence_length)
                     scores.append(score)
@@ -1283,7 +1290,7 @@ class CPPOTrainer(PPOTrainer):
     ) -> None:
         """Override store_metrics to organize metrics by task."""
         if not hasattr(self, '_stored_metrics'):
-            self._stored_metric: Dict = defaultdict(lambda: defaultdict(list))
+            self._stored_metrics = defaultdict(lambda: defaultdict(list))
 
         # Use train_eval if provided, otherwise fall back to split
         effective_split = train_eval if train_eval is not None else split
