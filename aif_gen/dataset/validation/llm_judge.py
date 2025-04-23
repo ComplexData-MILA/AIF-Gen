@@ -3,7 +3,10 @@ import logging
 import os
 from collections import defaultdict
 from functools import lru_cache
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    pass
 
 import backoff
 import numpy as np
@@ -52,6 +55,17 @@ async def llm_judge_validation(
     cache = await AsyncElasticsearchCache.maybe_from_env_var(
         f'CACHE_VALIDATION_{model_name}'
     )
+    dataset_name = os.environ.get('DATASET_NAME', 'unspecified')
+    opik_base_url = os.environ.get('OPIK_BASE_URL')
+    opik_client = None
+    if opik_base_url is not None:
+        import opik
+
+        opik_client = opik.Opik(
+            host=opik_base_url,
+            project_name=os.environ.get('OPIK_PROJECT_NAME'),
+            api_key=os.environ.get('OPIK_API_KEY'),
+        )
 
     if dry_run:
         logging.info(f'Doing dry-run data validation on a single sample...')
@@ -138,6 +152,23 @@ async def llm_judge_validation(
             score, dataset_idx, metric_name = result
             if score is not None:
                 results[dataset_idx][metric_name].append(score)
+
+        # Log to Opik if provided.
+        for _dataset_idx, (dataset, stats) in enumerate(zip(datasets, results)):
+            for _sample_idx, sample in enumerate(dataset.samples):
+                if opik_client is not None:
+                    opik_client.trace(
+                        name=f'{_sample_idx:05d} of dataset {dataset_name}/{_dataset_idx:02d}',
+                        input={'prompt': sample.prompt},
+                        output={
+                            'chosen': sample.chosen,
+                            'rejected': sample.rejected,
+                            **{
+                                _metric_name: metrics[_sample_idx]
+                                for _metric_name, metrics in stats.items()
+                            },
+                        },
+                    )
 
         aggregated_results: List[Optional[Dict[str, float]]] = []
         for i, dataset in enumerate(datasets):

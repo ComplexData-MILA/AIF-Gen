@@ -23,6 +23,7 @@ dependencies = [
     "nltk>=3.9.1",
     "numpy>=2.0.2",
     "openai>=1.61.1",
+    "opik>=1.7.9",
     "pydantic>=2.10.4",
     "pytest-asyncio>=0.25.3",
     "pytest-mock>=3.14.0",

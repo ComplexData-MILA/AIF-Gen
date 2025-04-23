@@ -90,6 +90,19 @@ uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf
 uv run aif validate
 ```
 
+To log the validation to Opik for automated evaluation, set the following environment variables:
+
+```sh
+export OPIK_BASE_URL="..."
+export OPIK_PROJECT_NAME="..."
+
+# optional for self-hosted installation
+export OPIK_API_KEY="..."
+
+# optionally, specify dataset name sent to Opik
+export DATASET_NAME="education_qna_direct"
+```
+
 ### Transform Data
 
 ```sh
