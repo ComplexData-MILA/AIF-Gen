@@ -92,7 +92,9 @@ async def generate_continual_dataset(
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(f'Exception occured on dry-run, skipping generation: {e}')
+            logging.exception(
+                f'Exception occurred on dry-run, skipping generation: {e}'
+            )
             raise e
         finally:
             if cache is not None:
@@ -670,7 +672,7 @@ async def transmute_continual_dataset(
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(f'Exception occured on dry-run, skipping transmute: {e}')
+            logging.exception(f'Exception occurred on dry-run, skipping transmute: {e}')
             raise e
         finally:
             if cache is not None:
@@ -725,7 +727,7 @@ async def transmute_continual_dataset(
             continual_dataset.append(AlignmentDataset(tasks[i], samples[i], train_frac))
         return continual_dataset
     except BaseException as e:
-        logging.exception(f'Exception occured while generating dataset: {e}')
+        logging.exception(f'Exception occurred while generating dataset: {e}')
         for fut in futures:
             fut.cancel()
         await tqdm.gather(*futures)

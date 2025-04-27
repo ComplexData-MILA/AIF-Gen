@@ -72,7 +72,9 @@ async def llm_judge_validation(
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(f'Exception occured on dry-run, skipping validation: {e}')
+            logging.exception(
+                f'Exception occurred on dry-run, skipping validation: {e}'
+            )
             raise e
         finally:
             if cache is not None:
@@ -159,7 +161,7 @@ async def llm_judge_validation(
         return aggregated_results
 
     except BaseException as e:
-        logging.exception(f'Exception occured while generating dataset: {e}')
+        logging.exception(f'Exception occurred while generating dataset: {e}')
         for fut in futures:
             fut.cancel()
         await tqdm.gather(*futures, return_exceptions=True)

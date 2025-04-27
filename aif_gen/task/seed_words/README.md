@@ -14,6 +14,6 @@ Generate 100 distinct words related to the following topic:  \<topic_name>. Retu
 
 </blockquote>
 
-The _\<topic_name>_ was substitued according to the corresponding python file. (e.g. _education_ seed words in `education.py`)
+The _\<topic_name>_ was substituted according to the corresponding python file. (e.g. _education_ seed words in `education.py`)
 
 _Note_: Resulting vocabulary lists were post-processed by removing duplicate words.

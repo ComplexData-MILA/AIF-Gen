@@ -44,7 +44,7 @@ class ContinualDPOArguments(ScriptArguments):
     checkpoint_dir: Optional[str] = field(
         default=None,
         metadata={
-            'help': 'The directory containing the checkpoints to evaluate (used only in eval checkpoints sctipt)'
+            'help': 'The directory containing the checkpoints to evaluate (used only in eval checkpoints script)'
         },
     )
     wandb_project: Optional[str] = field(

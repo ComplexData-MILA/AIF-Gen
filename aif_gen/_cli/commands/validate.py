@@ -179,7 +179,7 @@ def validate(
             )
             result = asyncio.get_event_loop().run_until_complete(fut)
         except (openai.OpenAIError, Exception) as e:
-            logging.exception(f'Error occured trying to validate data with vLLM: {e}')
+            logging.exception(f'Error occurred trying to validate data with vLLM: {e}')
             result = None
 
         results['llm_judge_validation'] = result
@@ -207,7 +207,7 @@ def validate(
             )
             result = asyncio.get_event_loop().run_until_complete(fut)
         except (openai.OpenAIError, Exception) as e:
-            logging.exception(f'Error occured trying to embed data with vLLM: {e}')
+            logging.exception(f'Error occurred trying to embed data with vLLM: {e}')
             result = None
 
         results['llm_embedding_diversity'] = result

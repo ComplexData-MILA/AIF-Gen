@@ -58,7 +58,9 @@ async def llm_embedding_diversity(
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(f'Exception occured on dry-run, skipping validation: {e}')
+            logging.exception(
+                f'Exception occurred on dry-run, skipping validation: {e}'
+            )
             raise e
 
         logging.info('Dry run was a success.')
@@ -139,7 +141,7 @@ async def llm_embedding_diversity(
         return aggregated_results
 
     except BaseException as e:
-        logging.exception(f'Exception occured while generating dataset: {e}')
+        logging.exception(f'Exception occurred while generating dataset: {e}')
         for fut in futures:
             fut.cancel()
         await tqdm.gather(*futures)

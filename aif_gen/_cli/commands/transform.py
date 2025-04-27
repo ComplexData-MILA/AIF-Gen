@@ -43,7 +43,7 @@ def preference_swap(
     p: float,
     hf_repo_id: Optional[str],
 ) -> None:
-    r"""Swap the 'chosen' and 'rejected' respones for each sample in the dataset with probability.
+    r"""Swap the 'chosen' and 'rejected' responses for each sample in the dataset with probability.
 
     INPUT_DATA_FILE: Path to the input dataset.
     OUTPUT_DATA_FILE: Path to the output (transformed) dataset.
