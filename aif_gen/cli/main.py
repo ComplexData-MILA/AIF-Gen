@@ -2,15 +2,15 @@ import pathlib
 
 import click
 
-from aif_gen._cli.commands.filter import filter_dataset
-from aif_gen._cli.commands.generate import generate
-from aif_gen._cli.commands.merge import merge
-from aif_gen._cli.commands.preview import preview
-from aif_gen._cli.commands.sample import sample
-from aif_gen._cli.commands.split import split
-from aif_gen._cli.commands.transform import transform
-from aif_gen._cli.commands.transmute import transmute
-from aif_gen._cli.commands.validate import validate
+from aif_gen.cli.commands.filter import filter_dataset
+from aif_gen.cli.commands.generate import generate
+from aif_gen.cli.commands.merge import merge
+from aif_gen.cli.commands.preview import preview
+from aif_gen.cli.commands.sample import sample
+from aif_gen.cli.commands.split import split
+from aif_gen.cli.commands.transform import transform
+from aif_gen.cli.commands.transmute import transmute
+from aif_gen.cli.commands.validate import validate
 from aif_gen.util.logging import setup_basic_logging
 
 

@@ -4,36 +4,36 @@ Under construction
 
 ## Filter
 
-::: aif_gen.\_cli.commands.filter
+::: aif_gen.cli.commands.filter
 
 ## Generate
 
-::: aif_gen.\_cli.commands.generate
+::: aif_gen.cli.commands.generate
 
 ## Merge
 
-::: aif_gen.\_cli.commands.merge
+::: aif_gen.cli.commands.merge
 
 ## Preview
 
-::: aif_gen.\_cli.commands.preview
+::: aif_gen.cli.commands.preview
 
 ## Sample
 
-::: aif_gen.\_cli.commands.sample
+::: aif_gen.cli.commands.sample
 
 ## Split
 
-::: aif_gen.\_cli.commands.split
+::: aif_gen.cli.commands.split
 
 ## Transform
 
-::: aif_gen.\_cli.commands.transform
+::: aif_gen.cli.commands.transform
 
 ## Transmute
 
-::: aif_gen.\_cli.commands.transmute
+::: aif_gen.cli.commands.transmute
 
 ## Validate
 
-::: aif_gen.\_cli.commands.validate
+::: aif_gen.cli.commands.validate
