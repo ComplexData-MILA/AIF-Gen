@@ -38,8 +38,6 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest>=8.3.3",
     "ruff>=0.7.3",
-    "sphinx>=7.4.7",
-    "sphinx-rtd-theme>=3.0.2",
 ]
 benchmarks-dpo = [
     "datasets>=3.2.0",
@@ -63,6 +61,11 @@ benchmarks-ppo = [
 benchmarks = [
     "setuptools>=75.8.0",
     "huggingface-hub==0.29.2",
+]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.12",
+    "mkdocstrings[python]>=0.29.1",
 ]
 
 [tool.mypy]
