@@ -535,13 +535,10 @@ async def _generate_sample_with_preference_axes(
         async with async_semaphore:
             if cache is not None:
                 output = await cache.get(task_prompt + task_prompt_second)
-                if output is None:
-                    raise ValueError(
-                        f'No cached response for task prompt: {task_prompt + task_prompt_second}'
-                    )
-                structured_output = ResponsePair.model_validate_json(output)
-                output1_str: str = structured_output.chosen
-                output2_str: str = structured_output.rejected
+                if output is not None:
+                    structured_output = ResponsePair.model_validate_json(output)
+                    output1_str: str = structured_output.chosen
+                    output2_str: str = structured_output.rejected
             else:
                 output = None
 

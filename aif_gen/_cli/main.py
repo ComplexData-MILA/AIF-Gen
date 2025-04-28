@@ -2,6 +2,7 @@ import pathlib
 
 import click
 
+from aif_gen._cli.commands.clean import clean_dataset
 from aif_gen._cli.commands.filter import filter_dataset
 from aif_gen._cli.commands.generate import generate
 from aif_gen._cli.commands.merge import merge
@@ -47,6 +48,7 @@ cli.add_command(split)
 cli.add_command(sample)
 cli.add_command(transmute)
 cli.add_command(filter_dataset)
+cli.add_command(clean_dataset)
 
 if __name__ == '__main__':
     cli()
