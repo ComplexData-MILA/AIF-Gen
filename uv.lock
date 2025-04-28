@@ -49,23 +49,12 @@ dependencies = [
 
 [package.dev-dependencies]
 benchmarks = [
-    { name = "huggingface-hub" },
-    { name = "setuptools" },
-]
-benchmarks-dpo = [
-    { name = "datasets" },
-    { name = "deepspeed" },
-    { name = "peft" },
-    { name = "submitit" },
-    { name = "transformers" },
-    { name = "trl" },
-    { name = "wandb" },
-]
-benchmarks-ppo = [
     { name = "accelerate" },
     { name = "datasets" },
     { name = "deepspeed" },
+    { name = "huggingface-hub" },
     { name = "peft" },
+    { name = "setuptools" },
     { name = "submitit" },
     { name = "transformers" },
     { name = "trl" },
@@ -101,27 +90,16 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 benchmarks = [
-    { name = "huggingface-hub", specifier = "==0.29.2" },
-    { name = "setuptools", specifier = ">=75.8.0" },
-]
-benchmarks-dpo = [
-    { name = "datasets", specifier = ">=3.2.0" },
+    { name = "accelerate", specifier = ">=0.34.2" },
+    { name = "datasets", specifier = ">=3.3.2" },
     { name = "deepspeed", specifier = ">=0.16.3" },
+    { name = "huggingface-hub", specifier = "==0.29.2" },
     { name = "peft", specifier = ">=0.14.0" },
+    { name = "setuptools", specifier = ">=75.8.0" },
     { name = "submitit", specifier = ">=1.5.2" },
-    { name = "transformers", specifier = ">=4.48.3" },
-    { name = "trl", specifier = ">=0.14.0" },
-    { name = "wandb", specifier = ">=0.19.6" },
-]
-benchmarks-ppo = [
-    { name = "accelerate", specifier = "==0.34.2" },
-    { name = "datasets", specifier = ">=3.2.0" },
-    { name = "deepspeed", specifier = "==0.16.3" },
-    { name = "peft", specifier = ">=0.14.0" },
-    { name = "submitit", specifier = ">=1.5.2" },
-    { name = "transformers", specifier = ">=4.48.3" },
-    { name = "trl", specifier = ">=0.14.0" },
-    { name = "wandb", specifier = ">=0.19.6" },
+    { name = "transformers", specifier = ">=4.49.0" },
+    { name = "trl", specifier = ">=0.15.2" },
+    { name = "wandb", specifier = ">=0.19.8" },
 ]
 dev = [
     { name = "isort", specifier = ">=5.13.2" },
@@ -2527,7 +2505,7 @@ name = "triton"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "python_full_version < '3.12'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/db/ee/8d50d44ed5b63677bb387f4ee67a7dbaaded0189b320ffe82685a6827728/triton-2.3.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5ce4b8ff70c48e47274c66f269cce8861cf1dc347ceeb7a67414ca151b1822d8", size = 168055246 },

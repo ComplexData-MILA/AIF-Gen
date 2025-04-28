@@ -7,7 +7,7 @@ This guide explains how to run the `copr.py` script for continual learning using
 First, ensure you have the necessary dependencies installed. You can synchronize them using `uv`:
 
 ```sh
-uv sync --group benchmarks.dpo
+uv sync --group benchmarks
 ```
 
 Running COPR

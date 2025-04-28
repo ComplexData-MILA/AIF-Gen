@@ -5,7 +5,7 @@ This implementation extends the PPO trainer with Elastic Weight Consolidation (E
 ### Sync additional dependencies
 
 ```sh
-uv sync --group benchmarks.ppo
+uv sync --group benchmarks
 ```
 
 ## Run PPO with EWC

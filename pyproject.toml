@@ -41,28 +41,17 @@ dev = [
     "sphinx>=7.4.7",
     "sphinx-rtd-theme>=3.0.2",
 ]
-benchmarks-dpo = [
-    "datasets>=3.2.0",
-    "deepspeed>=0.16.3",
-    "peft>=0.14.0",
-    "submitit>=1.5.2",
-    "transformers>=4.48.3",
-    "trl>=0.14.0",
-    "wandb>=0.19.6",
-]
-benchmarks-ppo = [
-    "accelerate==0.34.2",
-    "datasets>=3.2.0",
-    "deepspeed==0.16.3",
-    "peft>=0.14.0",
-    "submitit>=1.5.2",
-    "transformers>=4.48.3",
-    "trl>=0.14.0",
-    "wandb>=0.19.6",
-]
 benchmarks = [
     "setuptools>=75.8.0",
     "huggingface-hub==0.29.2",
+    "accelerate>=0.34.2",
+    "datasets>=3.3.2",
+    "deepspeed>=0.16.3",
+    "peft>=0.14.0",
+    "submitit>=1.5.2",
+    "transformers>=4.49.0",
+    "trl>=0.15.2",
+    "wandb>=0.19.8",
 ]
 
 [tool.mypy]
