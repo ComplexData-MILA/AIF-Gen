@@ -1,4 +1,4 @@
-name: "continual_ppo_sweep"
+name: "continual_cppo_sweep"
 method: random
 metric:
   name: eval_loss
@@ -18,7 +18,7 @@ parameters:
     values: [50, 100]
 command:
   - uv run
-  - benchmarks/ppo/ppo_continual.py
+  - benchmarks/cppo/cppo_continual.py
   - --dataset_name
   - debug
   - --model_name_or_path
@@ -38,5 +38,5 @@ command:
   - --logging_steps
   - 25
   - --run_output_dir
-  - Qwen2-0.5B-PPO
+  - Qwen2-0.5B-CPPO
   - --no_remove_unused_columns
