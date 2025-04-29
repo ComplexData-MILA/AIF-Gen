@@ -504,17 +504,11 @@ class CPPOTrainer(PPOTrainer):
         self.threshold = 0.5  # Threshold for detection
         self.ub = 2.0  # Upper bound
         self.lb = 0.2  # Lower bound
-        self.abl_type = 'balance'  # Default ablation type
 
         assert len(old_rewards.shape) == 2
-
-        # logP_mean = stats["old_logP/mean"]
         logp_mean = old_logprobs.mean(dim=-1)
-        # logP_std = stats["old_logP/std"]
         logp_std = old_logprobs.std(dim=-1)
-        # rewards_mean = stats["old_rewards/mean"]
         rewards_mean = old_rewards.mean(dim=-1)
-        # rewards_std = stats["old_rewards/std"]
         rewards_std = old_rewards.std(dim=-1)
 
         N = old_logprobs.shape[0]
@@ -536,123 +530,27 @@ class CPPOTrainer(PPOTrainer):
         cond12 = (
             torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threshold12
         )
-
         cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
         cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
 
-        if 'linear' in self.abl_type:
-            for i in range(N):
-                if cond11[i]:
-                    if cond21[i]:  # high retention & high learning
-                        coff_learn[i] = min(
-                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
-                            + 1
-                            - self.threshold,
-                            self.ub,
-                        )
-                        coff_reg[i] = min(
-                            (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std
-                            + 1
-                            - self.threshold,
-                            self.ub,
-                        )
-                    elif cond22[i]:  # normal retention & high learning
-                        coff_learn[i] = min(
-                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
-                            + 1
-                            - self.threshold,
-                            self.ub,
-                        )
-                        # coff_reg[i] = 0.2
-                elif cond12[i]:
-                    if cond21[i]:  # low retention & high learning
-                        coff_learn[i] = min(
-                            (old_logprobs[i, lenth[i]] - logp_mean) / logp_std
-                            + 1
-                            - self.threshold,
-                            self.ub,
-                        )
-                        coff_reg[i] = max(
-                            1
-                            + self.threshold
-                            + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
-                            self.lb,
-                        )
-                    elif cond22[i]:  # low retention & low Learning
-                        coff_learn[i] = max(
-                            1
-                            + self.threshold
-                            + (old_logprobs[i, lenth[i]] - logp_std) / rewards_std,
-                            0.5,
-                        )
-                        coff_reg[i] = max(
-                            1
-                            + self.threshold
-                            + (old_rewards[i, lenth[i]] - rewards_mean) / rewards_std,
-                            self.lb,
-                        )
-        elif 'balance' in self.abl_type:
-            for i in range(N):
-                if cond11[i]:
-                    if cond21[i]:  # high retention & high learning
-                        coff_learn[i] = self.ub
-                        coff_reg[i] = self.ub
-                    elif cond22[i]:  # normal retention & high learning
-                        coff_learn[i] = self.ub
-                        # TODO: review meaning of this
-                        coff_reg[i] = self.lb
-                elif cond12[i]:
-                    if cond21[i]:  # low retention & high learning
-                        coff_learn[i] = self.ub
-                        coff_reg[i] = self.lb
-                    elif cond22[i]:  # low retention & low Learning
-                        coff_learn[i] = self.lb
-                        coff_reg[i] = self.lb
-
-        elif 'repeat' in self.abl_type:
-            for i in range(N):
-                if cond11[i]:  # reward
-                    if cond21[i]:  # high retention & high learning
-                        coff_learn[i] = self.ub
-                        coff_reg[i] = self.ub
-                    elif cond22[i]:  # normal retention & high learning
-                        coff_learn[i] = self.ub
-                elif cond12[i]:  # reward
+        for i in range(N):
+            if cond11[i]:
+                if cond21[i]:  # high retention & high learning
+                    coff_learn[i] = self.ub
+                    coff_reg[i] = self.ub
+                elif cond22[i]:  # normal retention & high learning
+                    coff_learn[i] = self.ub
+                    coff_reg[i] = self.lb
+            elif cond12[i]:
+                if cond21[i]:  # low retention & high learning
+                    coff_learn[i] = self.ub
+                    coff_reg[i] = self.lb
+                elif cond22[i]:  # low retention & low Learning
                     coff_learn[i] = self.lb
                     coff_reg[i] = self.lb
-        #############################################
-
-        else:  # constant
-            for i in range(N):
-                if cond11[i]:
-                    if cond21[i]:  # high retention & high learning
-                        coff_learn[i] = 2.0
-                        coff_reg[i] = 2.0
-                    elif cond22[i]:  # normal retention & high learning
-                        coff_learn[i] = 2.0
-                        # coff_reg[i] = 0.2
-                elif cond12[i]:
-                    if cond21[i]:  # low retention & high learning
-                        coff_learn[i] = 2.0
-                        coff_reg[i] = 0.2
-                    elif cond22[i]:  # low retention & low Learning
-                        coff_learn[i] = 0.5
-                        coff_reg[i] = 0.2
 
         coff_learn = coff_learn.to(device)
         coff_reg = coff_reg.to(device)
-
-        if self.abl_type is not None:
-            if self.abl_type == 'alpha':
-                for i in range(N):
-                    coff_learn[i] = 1.0
-            if self.abl_type == 'beta':
-                for i in range(N):
-                    coff_reg[i] = 1.0
-            if self.abl_type == 'beta2':
-                for i in range(N):
-                    coff_reg[i] = 0.0
-
         return coff_learn, coff_reg
 
     def train(self) -> None:
@@ -1009,21 +907,9 @@ class CPPOTrainer(PPOTrainer):
                                 / mask_alpha.sum()
                             )
 
-                            # Optional: L2 Regularization between logprobs
-                            if 'norm' in self.abl_type:
-                                norm_logprobs = logprobs_diff / logprobs_diff.norm(
-                                    dim=-1, keepdim=True
-                                )
-                                norm_old = mb_logprobs / mb_logprobs.norm(
-                                    dim=-1, keepdim=True
-                                )
-                                l2_loss = (
-                                    (norm_logprobs - norm_old).square() * mask_beta
-                                ).sum() / mask_beta.sum()
-                            else:
-                                l2_loss = (
-                                    (logprobs_diff).square() * mask_beta
-                                ).sum() / mask_beta.sum()
+                            l2_loss = (
+                                (logprobs_diff).square() * mask_beta
+                            ).sum() / mask_beta.sum()
 
                             # Total CPPO loss
                             loss = (
