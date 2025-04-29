@@ -173,7 +173,7 @@ def main(
                 dataset_name='CPPO_' + clean_dataset_name + '_' + str(i),
             )
 
-        del ref_policy
+        ref_policy = None
         gc.collect()
         torch.cuda.empty_cache()
 
