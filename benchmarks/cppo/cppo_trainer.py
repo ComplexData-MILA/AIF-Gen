@@ -120,8 +120,8 @@ class CPPOTrainer(PPOTrainer):
     policy_value_models: Any  # the policy and value model wrapper
     ds_wrapped_models: Any  # TODO work with this after deepspeed is initialized
     accelerator: Accelerator  # now non-optional after creation
-    old_logprobs: Optional[Union[List[Tensor], Tensor]] = []
-    old_rewards: Optional[Union[List[Tensor], Tensor]] = []
+    old_logprobs: Optional[Tensor] = None
+    old_rewards: Optional[Tensor] = None
     ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
 
     def __init__(
@@ -738,10 +738,11 @@ class CPPOTrainer(PPOTrainer):
                 advantages = torch.masked_fill(advantages, padding_mask, 0)
                 torch.cuda.empty_cache()
 
-                # CPPO
-                coef_learn, coef_reg = get_cppo_plasticity_weights(
-                    self.old_logprobs, self.old_rewards, mask
-                )
+                coef_learn, coef_reg = None, None
+                if self.old_logprobs is not None:
+                    coef_learn, coef_reg = get_cppo_plasticity_weights(
+                        self.old_logprobs, self.old_rewards, mask
+                    )
 
             # Do multiple epochs of CPPO training, with a fresh random shuffle in each epoch
             for ppo_epoch_idx in range(args.num_ppo_epochs):
@@ -795,13 +796,15 @@ class CPPOTrainer(PPOTrainer):
                             vf_loss_max = torch.max(vf_losses1, vf_losses2)
 
                             mask = ~padding_mask[micro_batch_inds]
-                            mask = mask.to(coef_learn.dtype)
-                            mask_alpha = torch.matmul(torch.diag(coef_learn), mask)
-                            mask_beta = torch.matmul(torch.diag(coef_reg), mask)
-                            if mask_alpha.sum() == 0:
-                                mask_alpha = mask
-                            if mask_beta.sum() == 0:
-                                mask_beta = mask
+
+                            def _get_mask(coef: Optional[Tensor]) -> Tensor:
+                                if coef is None:
+                                    return mask
+                                _mask = torch.matmul(torch.diag(coef), mask)
+                                return mask if _mask.sum() == 0 else _mask
+
+                            mask_alpha = _get_mask(coef_learn)
+                            mask_beta = _get_mask(coef_reg)
                             vf_loss = 0.5 * masked_mean(vf_loss_max, mask_alpha)
                             vf_clipfrac = masked_mean(
                                 (vf_losses2 > vf_losses1).float(), mask_alpha
@@ -969,9 +972,9 @@ class CPPOTrainer(PPOTrainer):
                 self.generate_completions(sampling=True)
                 torch.cuda.empty_cache()
 
-            # deepcopy logprobs to old_logprobs
+            self.old_logprobs = logprobs.clone().detach()
+            self.old_rewards = rewards.clone().detach()
 
-            # Don't delete ref_logprobs here
             del (
                 query_responses,
                 responses,
@@ -1276,7 +1279,6 @@ def get_cppo_plasticity_weights(
     Returns:
         Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
     """
-    assert len(old_rewards.shape) == 2
     logp_mean = old_logprobs.mean(dim=-1)
     logp_std = old_logprobs.std(dim=-1)
     rewards_mean = old_rewards.mean(dim=-1)
