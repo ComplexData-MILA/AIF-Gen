@@ -9,7 +9,6 @@ from aif_gen.cli.commands.preview import preview
 from aif_gen.cli.commands.sample import sample
 from aif_gen.cli.commands.split import split
 from aif_gen.cli.commands.transform import transform
-from aif_gen.cli.commands.transmute import transmute
 from aif_gen.cli.commands.validate import validate
 from aif_gen.util.logging import setup_basic_logging
 
@@ -45,7 +44,6 @@ cli.add_command(merge)
 cli.add_command(transform)
 cli.add_command(split)
 cli.add_command(sample)
-cli.add_command(transmute)
 cli.add_command(filter_dataset)
 
 if __name__ == '__main__':

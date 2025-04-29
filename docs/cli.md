@@ -30,10 +30,6 @@ Under construction
 
 ::: aif_gen.cli.commands.transform
 
-## Transmute
-
-::: aif_gen.cli.commands.transmute
-
 ## Validate
 
 ::: aif_gen.cli.commands.validate
