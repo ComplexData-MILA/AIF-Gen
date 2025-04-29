@@ -487,72 +487,6 @@ class CPPOTrainer(PPOTrainer):
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
 
-    def detect_track(
-        self, old_logprobs: Tensor, old_rewards: Tensor, mask: Tensor
-    ) -> tuple[Tensor, Tensor]:
-        """Detect track for CPPO.
-
-        Args:
-            old_logprobs (Tensor): [B, response_size] tensor of old log probabilities.
-            old_rewards (Tensor): [B, response_size] tensor of old rewards.
-            mask (Tensor): Mask tensor indicating valid positions.
-
-        Returns:
-            Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
-        """
-        # Initialize coefficients for learning and regularization
-        self.threshold = 0.5  # Threshold for detection
-        self.ub = 2.0  # Upper bound
-        self.lb = 0.2  # Lower bound
-
-        assert len(old_rewards.shape) == 2
-        logp_mean = old_logprobs.mean(dim=-1)
-        logp_std = old_logprobs.std(dim=-1)
-        rewards_mean = old_rewards.mean(dim=-1)
-        rewards_std = old_rewards.std(dim=-1)
-
-        N = old_logprobs.shape[0]
-        device = old_logprobs.device
-
-        coff_learn = torch.ones_like(old_logprobs[:, 0])
-        coff_reg = torch.ones_like(old_logprobs[:, 0])
-
-        lenth = mask.sum(dim=-1) - 1
-
-        threshold11 = (rewards_mean + self.threshold * rewards_std).to(device)
-        threshold12 = (rewards_mean - self.threshold * rewards_std).to(device)
-        threshold21 = (logp_mean + self.threshold * logp_std).to(device)
-        threshold22 = (logp_mean - self.threshold * logp_std).to(device)
-
-        cond11 = (
-            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threshold11
-        )
-        cond12 = (
-            torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threshold12
-        )
-        cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
-        cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
-
-        for i in range(N):
-            if cond11[i]:
-                if cond21[i]:  # high retention & high learning
-                    coff_learn[i] = self.ub
-                    coff_reg[i] = self.ub
-                elif cond22[i]:  # normal retention & high learning
-                    coff_learn[i] = self.ub
-                    coff_reg[i] = self.lb
-            elif cond12[i]:
-                if cond21[i]:  # low retention & high learning
-                    coff_learn[i] = self.ub
-                    coff_reg[i] = self.lb
-                elif cond22[i]:  # low retention & low Learning
-                    coff_learn[i] = self.lb
-                    coff_reg[i] = self.lb
-
-        coff_learn = coff_learn.to(device)
-        coff_reg = coff_reg.to(device)
-        return coff_learn, coff_reg
-
     def train(self) -> None:
         """Override train method to preserve reference model."""
         args = self.args
@@ -747,7 +681,7 @@ class CPPOTrainer(PPOTrainer):
                 values = torch.cat(values, 0)
 
                 # CPPO
-                coff_learn, coff_reg = self.detect_track(
+                coff_learn, coff_reg = detect_track(
                     self.old_logprobs, self.old_rewards, mask
                 )
 
@@ -1340,3 +1274,69 @@ class CPPOTrainer(PPOTrainer):
 
         # Restore the original model
         self.model = original_model
+
+
+def detect_track(
+    old_logprobs: Tensor,
+    old_rewards: Tensor,
+    mask: Tensor,
+    threshold: float = 0.5,
+    ub: float = 2.0,
+    lb: float = 0.2,
+) -> tuple[Tensor, Tensor]:
+    """Detect track for CPPO.
+
+    Args:
+        old_logprobs (Tensor): [B, response_size] tensor of old log probabilities.
+        old_rewards (Tensor): [B, response_size] tensor of old rewards.
+        mask (Tensor): Mask tensor indicating valid positions.
+        threshold (float): Threshold for detection.
+        ub (float): Upper bound.
+        lb (float): Lower bound.
+
+    Returns:
+        Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
+    """
+    assert len(old_rewards.shape) == 2
+    logp_mean = old_logprobs.mean(dim=-1)
+    logp_std = old_logprobs.std(dim=-1)
+    rewards_mean = old_rewards.mean(dim=-1)
+    rewards_std = old_rewards.std(dim=-1)
+
+    N = old_logprobs.shape[0]
+    device = old_logprobs.device
+
+    coff_learn = torch.ones_like(old_logprobs[:, 0])
+    coff_reg = torch.ones_like(old_logprobs[:, 0])
+
+    lenth = mask.sum(dim=-1) - 1
+
+    threshold11 = (rewards_mean + threshold * rewards_std).to(device)
+    threshold12 = (rewards_mean - threshold * rewards_std).to(device)
+    threshold21 = (logp_mean + threshold * logp_std).to(device)
+    threshold22 = (logp_mean - threshold * logp_std).to(device)
+
+    cond11 = torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) > threshold11
+    cond12 = torch.gather(old_rewards, dim=-1, index=lenth.unsqueeze(-1)) < threshold12
+    cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
+    cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
+
+    for i in range(N):
+        if cond11[i]:
+            if cond21[i]:  # high retention & high learning
+                coff_learn[i] = ub
+                coff_reg[i] = ub
+            elif cond22[i]:  # normal retention & high learning
+                coff_learn[i] = ub
+                coff_reg[i] = lb
+        elif cond12[i]:
+            if cond21[i]:  # low retention & high learning
+                coff_learn[i] = ub
+                coff_reg[i] = lb
+            elif cond22[i]:  # low retention & low Learning
+                coff_learn[i] = lb
+                coff_reg[i] = lb
+
+    coff_learn = coff_learn.to(device)
+    coff_reg = coff_reg.to(device)
+    return coff_learn, coff_reg
