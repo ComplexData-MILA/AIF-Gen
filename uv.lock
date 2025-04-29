@@ -90,8 +90,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 benchmarks = [
-    { name = "accelerate", specifier = ">=0.34.2" },
-    { name = "datasets", specifier = ">=3.3.2" },
+    { name = "accelerate", specifier = "==0.34.2" },
+    { name = "datasets", specifier = ">=3.2.0" },
     { name = "deepspeed", specifier = ">=0.16.3" },
     { name = "huggingface-hub", specifier = "==0.29.2" },
     { name = "peft", specifier = ">=0.14.0" },
