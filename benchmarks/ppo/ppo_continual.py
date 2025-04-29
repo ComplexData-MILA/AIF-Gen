@@ -3,6 +3,7 @@
 import os
 
 import torch
+import wandb as wb
 from continual_ppo_trainer import (
     ContinualPPOArguments,
     ContinualPPOConfig,
@@ -23,7 +24,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 
 

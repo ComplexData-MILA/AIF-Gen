@@ -7,7 +7,7 @@ from typing import Optional
 
 import click
 import openai
-import yaml
+import yaml  # type: ignore
 
 from aif_gen.generate.service import generate_continual_dataset
 from aif_gen.util.hf import upload_to_hf

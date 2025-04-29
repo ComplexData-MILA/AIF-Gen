@@ -24,10 +24,7 @@ dependencies = [
     "numpy>=2.0.2",
     "openai>=1.61.1",
     "pydantic>=2.10.4",
-    "pytest-asyncio>=0.25.3",
-    "pytest-mock>=3.14.0",
     "torch==2.3.0",
-    "types-pyyaml>=6.0.12.20241230",
 ]
 
 [dependency-groups]
@@ -35,7 +32,9 @@ dev = [
     "isort>=5.13.2",
     "mypy>=1.13.0",
     "pre-commit>=4.0.1",
+    "pytest-asyncio>=0.26.0",
     "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
     "pytest>=8.3.3",
     "ruff>=0.7.3",
 ]
