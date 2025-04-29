@@ -1,3 +1,4 @@
+import copy
 import functools
 import gc
 import inspect
@@ -7,7 +8,6 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
-import copy
 
 import numpy as np
 import torch
@@ -255,7 +255,9 @@ class CPPOTrainer(PPOTrainer):
             elif hasattr(core_model, 'policy_model'):
                 core_model = core_model.policy_model
             else:
-                raise ValueError("No policy attribute found - will not be able to generate")
+                raise ValueError(
+                    'No policy attribute found - will not be able to generate'
+                )
             self.ref_model = copy.deepcopy(core_model)
 
         # Always process new datasets for each task
