@@ -2,10 +2,6 @@
 
 Under construction
 
-## Filter
-
-::: aif_gen.cli.commands.filter
-
 ## Generate
 
 ::: aif_gen.cli.commands.generate
