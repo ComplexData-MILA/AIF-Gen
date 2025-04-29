@@ -111,6 +111,10 @@ class CPPOConfig(PPOConfig):
         default=False,
         metadata={'help': 'Whether to use greedy policy for evaluation.'},
     )
+    reg_coef: float = field(
+        default=0.1,
+        metadata={'help': 'CPPO knowledge retention regularization loss coefficient'},
+    )
 
 
 class CPPOTrainer(PPOTrainer):
