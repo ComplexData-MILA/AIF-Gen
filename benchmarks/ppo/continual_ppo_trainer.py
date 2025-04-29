@@ -1066,9 +1066,6 @@ class ContinualPPOTrainer(PPOTrainer):
         split: Optional[str] = None,
     ) -> None:
         """Override store_metrics to organize metrics by task."""
-        if not hasattr(self, '_stored_metrics'):
-            self._stored_metric: Dict = defaultdict(lambda: defaultdict(list))
-
         # Use train_eval if provided, otherwise fall back to split
         effective_split = train_eval if train_eval is not None else split
 
