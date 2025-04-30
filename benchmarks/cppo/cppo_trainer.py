@@ -812,9 +812,9 @@ class CPPOTrainer(PPOTrainer):
 
                             mask_alpha = _get_mask(coef_learn)
                             mask_beta = _get_mask(coef_reg)
-                            vf_loss = 0.5 * masked_mean(vf_loss_max, mask_alpha)
+                            vf_loss = 0.5 * masked_mean(vf_loss_max, mask)
                             vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(), mask_alpha
+                                (vf_losses2 > vf_losses1).float(), mask
                             )
                             logprobs_diff = new_logprobs - mb_logprobs
                             ratio = torch.exp(logprobs_diff * mask)
