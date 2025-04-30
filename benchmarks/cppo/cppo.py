@@ -1,6 +1,5 @@
 """Adaptation of the CPPO TRL training script for continual learning with task-based logging."""
 
-import gc
 import os
 
 import torch
@@ -178,9 +177,6 @@ def main(
             )
 
         ref_policy = None
-        gc.collect()
-        torch.cuda.empty_cache()
-
         old_logprobs, old_rewards = trainer.old_logprobs, trainer.old_rewards
 
     print('Training completed for all tasks!')
