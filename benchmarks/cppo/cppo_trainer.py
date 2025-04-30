@@ -803,6 +803,10 @@ class CPPOTrainer(PPOTrainer):
                             vf_loss_max = torch.max(vf_losses1, vf_losses2)
 
                             mask = ~padding_mask[micro_batch_inds]
+                            vf_loss = 0.5 * masked_mean(vf_loss_max, mask)
+                            vf_clipfrac = masked_mean(
+                                (vf_losses2 > vf_losses1).float(), mask
+                            )
 
                             def _get_mask(coef: Optional[Tensor]) -> Tensor:
                                 if coef is None:
@@ -812,12 +816,8 @@ class CPPOTrainer(PPOTrainer):
 
                             mask_alpha = _get_mask(coef_learn)
                             mask_beta = _get_mask(coef_reg)
-                            vf_loss = 0.5 * masked_mean(vf_loss_max, mask)
-                            vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(), mask
-                            )
                             logprobs_diff = new_logprobs - mb_logprobs
-                            ratio = torch.exp(logprobs_diff * mask)
+                            ratio = torch.exp(logprobs_diff)
                             pg_losses = -mb_advantage * ratio
                             pg_losses2 = -mb_advantage * torch.clamp(
                                 ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
@@ -839,9 +839,7 @@ class CPPOTrainer(PPOTrainer):
                                 entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
                                     prob_dist * logits, dim=-1
                                 )
-                                approxkl = torch.mean(
-                                    (ratio - 1) - logprobs_diff * mask
-                                )
+                                approxkl = 0.5 * (logprobs_diff**2).mean()
                                 approxkl_stats[
                                     ppo_epoch_idx,
                                     minibatch_idx,
