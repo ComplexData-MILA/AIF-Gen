@@ -124,8 +124,6 @@ class CPPOTrainer(PPOTrainer):
     policy_value_models: Any  # the policy and value model wrapper
     ds_wrapped_models: Any  # TODO work with this after deepspeed is initialized
     accelerator: Accelerator  # now non-optional after creation
-    old_logprobs: Optional[Tensor] = None
-    old_rewards: Optional[Tensor] = None
     ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
 
     def __init__(
@@ -152,6 +150,8 @@ class CPPOTrainer(PPOTrainer):
         ),
         callbacks: Optional[list[TrainerCallback]] = None,
         peft_config: Optional[dict] = None,
+        old_logprobs: Optional[Tensor] = None,
+        old_rewards: Optional[Tensor] = None,
     ):
         # Basic setup and validation
         if args is None:
@@ -490,6 +490,9 @@ class CPPOTrainer(PPOTrainer):
 
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
+
+        self.old_logprobs = old_logprobs
+        self.old_rewards = old_rewards
 
     def train(self) -> None:
         """Override train method to preserve reference model."""

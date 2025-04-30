@@ -4,7 +4,6 @@ import gc
 import os
 
 import torch
-import wandb as wb
 from cppo_trainer import CPPOArguments, CPPOConfig, CPPOTrainer
 from datasets import Dataset
 from transformers import (
@@ -21,6 +20,7 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
+import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 
 
@@ -112,6 +112,8 @@ def main(
                     raise ValueError(f'Reward model not found at {reward_path}')
 
     # Task Loop
+    old_logprobs, old_rewards = None, None
+
     for i, dataset in enumerate(continual_dataset):
         # Build custom repository name for this task
         custom_repo_name = (
@@ -139,6 +141,8 @@ def main(
             train_dataset=dataset[script_args.dataset_train_split],
             eval_dataset=dataset[script_args.dataset_test_split],
             peft_config=peft_config,
+            old_logprobs=old_logprobs,
+            old_rewards=old_rewards,
         )
         # Set current task in trainer for task-based logging
         trainer.set_task(f'task_{i}')
@@ -176,6 +180,8 @@ def main(
         ref_policy = None
         gc.collect()
         torch.cuda.empty_cache()
+
+        old_logprobs, old_rewards = trainer.old_logprobs, trainer.old_rewards
 
     print('Training completed for all tasks!')
 
