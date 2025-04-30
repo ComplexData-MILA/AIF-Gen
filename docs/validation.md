@@ -5,7 +5,6 @@
 
 ## Diversity
 
-::: aif_gen.dataset.validation.diversity
 ::: aif_gen.dataset.validation.embedding_diversity
 
 ## LLM Judge

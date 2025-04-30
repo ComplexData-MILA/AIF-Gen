@@ -13,7 +13,6 @@ from aif_gen.dataset.continual_alignment_dataset import (
 )
 from aif_gen.dataset.validation import (
     count_validation,
-    diversity_validation,
     entropy_validation,
     llm_embedding_diversity,
     llm_judge_validation,
@@ -42,12 +41,6 @@ from aif_gen.util.seed import seed_everything
     is_flag=True,
     default=True,
     help='Perform entropy validation on the dataset.',
-)
-@click.option(
-    '--validate-diversity/--no-validate-diversity',
-    is_flag=True,
-    default=True,
-    help='Perform diversity validation on the dataset.',
 )
 @click.option(
     '--validate-llm-judge/--no-validate-llm-judge',
@@ -119,7 +112,6 @@ def validate(
     output_validation_file: pathlib.Path,
     validate_count: bool,
     validate_entropy: bool,
-    validate_diversity: bool,
     validate_llm_judge: bool,
     validate_embedding_diversity: bool,
     num_workers: int,
@@ -157,11 +149,6 @@ def validate(
         logging.info('Performing entropy validation')
         results['entropy_validation'] = entropy_validation(dataset)
         logging.info('Finished entropy validation')
-
-    if validate_diversity:
-        logging.info('Performing diversity validation')
-        results['diversity_validation'] = diversity_validation(dataset, num_workers)
-        logging.info('Finished diversity validation')
 
     if validate_llm_judge:
         logging.info(f'Performing LLM judge validation with model: {model}')
