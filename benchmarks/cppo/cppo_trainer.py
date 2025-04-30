@@ -811,7 +811,7 @@ class CPPOTrainer(PPOTrainer):
                             def _get_mask(coef: Optional[Tensor]) -> Tensor:
                                 if coef is None:
                                     return mask
-                                _mask = torch.matmul(torch.diag(coef), mask)
+                                _mask = mask * coef[micro_batch_inds].unsqueeze(1)
                                 return mask if _mask.sum() == 0 else _mask
 
                             mask_alpha = _get_mask(coef_learn)
@@ -1294,7 +1294,7 @@ def get_cppo_plasticity_weights(
 
     coef_learn = torch.ones_like(old_logprobs[:, 0])
     coef_reg = torch.ones_like(old_logprobs[:, 0])
-
+    mask = mask[0]  # its a list of a tensor
     length = mask.sum(dim=-1) - 1
 
     threshold11 = (rewards_mean + threshold * rewards_std).to(device)
@@ -1302,8 +1302,12 @@ def get_cppo_plasticity_weights(
     threshold21 = (logp_mean + threshold * logp_std).to(device)
     threshold22 = (logp_mean - threshold * logp_std).to(device)
 
-    cond11 = torch.gather(old_rewards, dim=-1, index=length.unsqueeze(-1)) > threshold11
-    cond12 = torch.gather(old_rewards, dim=-1, index=length.unsqueeze(-1)) < threshold12
+    cond11 = (
+        torch.gather(old_rewards, dim=-1, index=length.unsqueeze(-1)) > threshold11
+    )[0]
+    cond12 = (
+        torch.gather(old_rewards, dim=-1, index=length.unsqueeze(-1)) < threshold12
+    )[0]
     cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
     cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
 
