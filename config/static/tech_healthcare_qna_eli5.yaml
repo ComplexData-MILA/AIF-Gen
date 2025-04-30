@@ -2,7 +2,7 @@
 task_specs:
   - num_samples: 10000
     alignment_task:
-      objective: "Given a healthcare (you choose randomly what topic in health sciences) or technology (you choose randomly what topic related to technology) question asked by a someone (could be hard or easy) in the prompt you generate, later an expert responds to this. The prompt is merely a literal question and nothing else please."
+      objective: "Ask a healthcare (you choose randomly what topic in health sciences) or technology related (you choose randomly what topic related to technology) question. The prompt is merely a literal question and nothing else please."
       preference: 'Explain the answer to the question at a level that could be understood by a five year old.'
       domain:
         technology:

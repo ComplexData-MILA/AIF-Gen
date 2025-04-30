@@ -1,0 +1,34 @@
+---
+task_specs:
+  - num_samples: 10000
+    alignment_task:
+      objective: "Generate an article on the topic of healthcare (you choose the exact detailed topic in health sciences ) or technology (you choose randomly what topic related to technology) that would be written by a professor or a pioneering expert in the field."
+      preference: 'Summarize the body of text at a level that could be understood by a five year old.'
+      domain:
+        technology:
+          weight: 0.5
+          seed_words:
+            - engineering
+            - AI
+            - internet
+            - computer
+            - innovation
+            - machine learning
+        physics:
+          weight: 0.5
+          seed_words:
+            - quantum
+            - relativity
+            - thermodynamics
+            - electromagnetism
+            - mechanics
+            - optics
+            - astrophysics
+            - dynamics
+            - gravitation
+            - oscillation
+            - momentum
+            - radiation
+            - interference
+            - nuclear
+            - cosmology

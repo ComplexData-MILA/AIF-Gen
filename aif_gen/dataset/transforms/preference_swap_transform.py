@@ -97,7 +97,11 @@ class PreferenceSwapTransform(DatasetTransform):
             else:
                 transformed_sample = replace(sample)  # Simply copy over
             transformed_samples.append(transformed_sample)
-        return AlignmentDataset(task=dataset.task, samples=transformed_samples)
+        return AlignmentDataset(
+            task=dataset.task,
+            samples=transformed_samples,
+            train_frac=dataset.train_frac,
+        )
 
     def _validate_swap_probability(self, swap_probability: float) -> None:
         if not 0 <= swap_probability <= 1:

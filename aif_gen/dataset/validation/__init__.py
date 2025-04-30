@@ -2,3 +2,4 @@ from aif_gen.dataset.validation.counts import count_validation
 from aif_gen.dataset.validation.diversity import diversity_validation
 from aif_gen.dataset.validation.entropy import entropy_validation
 from aif_gen.dataset.validation.llm_judge import llm_judge_validation
+from aif_gen.dataset.validation.embedding_diversity import llm_embedding_diversity

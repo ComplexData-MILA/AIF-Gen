@@ -23,7 +23,7 @@ def upload_to_hf(repo_id: str, local_path: Union[str, pathlib.Path]) -> None:
         logging.info(f'Uploading local file: {local_path} to {repo_id}')
         api.upload_file(
             path_or_fileobj=local_path,
-            path_in_repo=str(local_path),
+            path_in_repo=str(local_path.name),
             repo_id=repo_id,
             repo_type='dataset',
         )

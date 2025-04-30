@@ -15,17 +15,18 @@ uv sync --group benchmarks
 ```sh
 uv run benchmarks/reward_modeling.py \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
-    --dataset_name benchmarks/continual_data_debug.json \
+    --dataset_name preference_axes.json \
     --dataset_index 0 \
     --output_dir Qwen2-0.5B-Reward \
     --per_device_train_batch_size 8 \
     --num_train_epochs 1 \
     --gradient_checkpointing True \
     --learning_rate 1.0e-5 \
-    --logging_steps 25 \
+    --logging_steps 10 \
     --eval_strategy steps \
-    --eval_steps 50 \
-    --max_length 2048
+    --eval_steps 5 \
+    --max_length 2048 \
+    --wandb_entity aifgen
 ```
 
 ### With LoRA and Push to Hub

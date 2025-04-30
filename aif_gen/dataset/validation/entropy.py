@@ -25,7 +25,7 @@ def entropy_validation(
         'token_entropy'     -> float: The entropy across tokens (prompts and responses combined) for all samples in the AlignmentDataset.
         'prompt_entropy'    -> float: The entropy across prompts in samples of the AlignmentDataset.
         'chosen_entropy'    -> float: The entropy across chosen responses in samples of the AlignmentDataset.
-        'rejected_entropy'  -> float: The entropy acorss rejected responses in the samples of the AlignmentDataset.
+        'rejected_entropy'  -> float: The entropy across rejected responses in the samples of the AlignmentDataset.
 
     Note:
         If the input dataset is an AlignmentDataset (non-continual), this function

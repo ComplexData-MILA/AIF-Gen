@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project.scripts]
-aif = "aif_gen._cli.main:cli"
+aif = "aif_gen.cli.main:cli"
 
 [project]
 name = "aif-gen"
@@ -18,6 +18,7 @@ dependencies = [
     "backoff>=2.2.1",
     "click>=8.1.8",
     "datasets>=3.3.1",
+    "elasticsearch[async]>=8.17.2",
     "huggingface-hub>=0.29.1",
     "nltk>=3.9.1",
     "numpy>=2.0.2",
@@ -37,31 +38,23 @@ dev = [
     "pytest-cov>=6.0.0",
     "pytest>=8.3.3",
     "ruff>=0.7.3",
-    "sphinx>=7.4.7",
-    "sphinx-rtd-theme>=3.0.2",
-]
-benchmarks-dpo = [
-    "datasets>=3.2.0",
-    "deepspeed>=0.16.3",
-    "peft>=0.14.0",
-    "submitit>=1.5.2",
-    "transformers>=4.48.3",
-    "trl>=0.14.0",
-    "wandb>=0.19.6",
-]
-benchmarks-ppo = [
-    "accelerate==0.34.2",
-    "datasets>=3.2.0",
-    "deepspeed==0.16.3",
-    "peft>=0.14.0",
-    "submitit>=1.5.2",
-    "transformers>=4.48.3",
-    "trl>=0.14.0",
-    "wandb>=0.19.6",
 ]
 benchmarks = [
     "setuptools>=75.8.0",
     "huggingface-hub==0.29.2",
+    "peft>=0.14.0",
+    "submitit>=1.5.2",
+    "transformers>=4.49.0",
+    "trl>=0.15.2",
+    "wandb>=0.19.8",
+    "accelerate==0.34.2",
+    "datasets>=3.2.0",
+    "deepspeed==0.16.3",
+]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.12",
+    "mkdocstrings[python]>=0.29.1",
 ]
 
 [tool.mypy]

@@ -2,7 +2,7 @@
 task_specs:
   - num_samples: 10000
     alignment_task:
-      objective: "Generate a body of text on the topic of math (you choose randomly what topic in math) or social sciences or physics or chemistry that would be found in a blog article written by an expert in the field."
-      preference: 'Summarize the body of text at an expert level. Draw from technical literature when necessary.'
+      objective: "Generate an article on the topic of math or social sciences or physics or chemistry (you choose the exact detailed topic) that would be written by a professional expert in the field."
+      preference: 'Summarize the body of text at an expert level without making the summary too long or too short. Draw from technical literature when necessary.'
       domain:
         education:

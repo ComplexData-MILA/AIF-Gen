@@ -66,7 +66,7 @@ class ExtendedScriptArguments(ScriptArguments):
         metadata={'help': 'Slurm constraint to use.'},
     )
     wandb_project: Optional[str] = field(
-        default='AIFGen-dpo-continual-test',
+        default='reward_modeling_preference_axes',
         metadata={'help': 'Override the default WandB project name.'},
     )
     wandb_entity: Optional[str] = field(

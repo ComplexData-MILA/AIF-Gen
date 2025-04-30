@@ -3,7 +3,7 @@
 ### Sync additional dependencies
 
 ```sh
-uv sync --group benchmarks.dpo
+uv sync --group benchmarks
 ```
 
 ## Run DPO

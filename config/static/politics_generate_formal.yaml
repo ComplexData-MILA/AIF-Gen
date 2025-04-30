@@ -1,0 +1,8 @@
+---
+task_specs:
+  - num_samples: 10000
+    alignment_task:
+      objective: "Generate a body of text on a political topic (you choose randomly what topic in politics) that would be found in a blog article."
+      preference: 'Continue the story but in a formal style.'
+      domain:
+        politics:
