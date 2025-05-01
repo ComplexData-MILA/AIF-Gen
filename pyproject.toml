@@ -24,7 +24,7 @@ dependencies = [
     "numpy>=2.0.2",
     "openai>=1.61.1",
     "pydantic>=2.10.4",
-    "torch==2.3.0",
+    "torch==2.6.0",
 ]
 
 [dependency-groups]
