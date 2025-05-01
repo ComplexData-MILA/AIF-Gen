@@ -68,7 +68,7 @@ class Domain:
         for component_name, component_args in domain_dict.items():
             if component_args is None:
                 # Use domain component alias for seed words
-                component = DomainComponent(component_name, seed_words=component_name)
+                component = DomainComponent.from_dict({'name': component_name})
             else:
                 component_args['name'] = component_name
                 component = DomainComponent.from_dict(component_args)

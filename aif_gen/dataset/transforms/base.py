@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Union
+from typing import Any
 
-from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
-
-# Typedef for convenience
-Dataset = Union[ContinualAlignmentDataset, AlignmentDataset]
+from aif_gen.dataset import ContinualAlignmentDataset
+from aif_gen.typing import Dataset
 
 
 class DatasetTransform(ABC):

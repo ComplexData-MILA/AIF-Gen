@@ -19,7 +19,7 @@ class AlignmentTask:
 
     @classmethod
     def from_dict(cls, task_dict: Dict[str, Any]) -> 'AlignmentTask':
-        r"""Construct an AlignmentTask from dictionary represenetation.
+        r"""Construct an AlignmentTask from dictionary representation.
 
         Note:
             Expects 'domain', 'objective', and 'preference' keys to be present in the dictionary.
