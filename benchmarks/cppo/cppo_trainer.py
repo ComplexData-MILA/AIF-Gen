@@ -1299,7 +1299,6 @@ def get_cppo_plasticity_weights(
 
     coef_learn = torch.ones_like(old_logprobs[:, 0])
     coef_reg = torch.ones_like(old_logprobs[:, 0])
-    # mask = mask[0]  # its a list of a tensor
     length = mask.sum(dim=-1) - 1
 
     threshold11 = (rewards_mean + threshold * rewards_std).to(device)
