@@ -1,14 +1,9 @@
-"""Adaptation of the DPO TRL training script for continual learning."""
+"""Adaptation of the CPPO TRL training script for continual learning with task-based logging."""
 
 import os
 
 import torch
-import wandb as wb
-from continual_dpo_trainer import (
-    ContinualDPOArguments,
-    ContinualDPOConfig,
-    ContinualDPOTrainer,
-)
+from cppo_trainer import CPPOArguments, CPPOConfig, CPPOTrainer
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -24,18 +19,13 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
+import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
-from benchmarks.dpo.continual_dpo_trainer import (
-    ContinualDPOArguments,
-    ContinualDPOConfig,
-    ContinualDPOTrainer,
-)
 
 
-# The code is based on TRL DPO script https://github.com/huggingface/trl/blob/main/trl/scripts/dpo.py
 def main(
-    script_args: ContinualDPOArguments,
-    training_args: ContinualDPOConfig,
+    script_args: CPPOArguments,
+    training_args: CPPOConfig,
     model_args: ModelConfig,
 ) -> None:
     # Determine torch dtype and quantization configs
@@ -44,10 +34,9 @@ def main(
         if model_args.torch_dtype in ['auto', None]
         else getattr(torch, model_args.torch_dtype)
     )
+    quantization_config = get_quantization_config(model_args)
     if script_args.wandb_run_name is not None:
         training_args.run_name = script_args.wandb_run_name
-
-    quantization_config = get_quantization_config(model_args)
 
     # Model & Tokenizer Setup
     model_kwargs = dict(
@@ -58,44 +47,54 @@ def main(
         device_map=get_kbit_device_map() if quantization_config is not None else None,
         quantization_config=quantization_config,
     )
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path,
+
+    # Load main model and (optionally) reference model
+    model = str(training_args.sft_model_path)
+    policy = AutoModelForCausalLM.from_pretrained(
+        training_args.sft_model_path,
         trust_remote_code=model_args.trust_remote_code,
         **model_kwargs,
     )
     peft_config = get_peft_config(model_args)
     if peft_config is None:
-        ref_model = AutoModelForCausalLM.from_pretrained(
-            model_args.model_name_or_path,
+        ref_policy = AutoModelForCausalLM.from_pretrained(
+            training_args.sft_model_path,
             trust_remote_code=model_args.trust_remote_code,
             **model_kwargs,
         )
     else:
-        ref_model = None
+        ref_policy = None
+
+    # Load value model and policy model (main model)
+    value_model = AutoModelForSequenceClassification.from_pretrained(
+        script_args.value_model_path,
+        trust_remote_code=model_args.trust_remote_code,
+        num_labels=1,
+    )
 
     # Load tokenizer and set chat template if needed
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
+        training_args.sft_model_path,
+        trust_remote_code=model_args.trust_remote_code,
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     if tokenizer.chat_template is None:
         tokenizer.chat_template = SIMPLE_CHAT_TEMPLATE
 
-    # Distributed training hack
-    if script_args.ignore_bias_buffers:
-        model._ddp_params_and_buffers_to_ignore = [
-            name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
-        ]
-
     # Initialize continual dataset
     continual_dataset: list[dict[str, Dataset]] = init_continual_dataset(
         script_args.dataset_name,
         mock=training_args.mock,
         tokenizer=tokenizer,
-        tools=training_args.tools,
+        tools=None,
     )
     output_dir = training_args.output_dir
+
+    # Extract clean dataset name for repo naming
+    clean_dataset_name = os.path.basename(script_args.dataset_name)
+    if '.' in clean_dataset_name:
+        clean_dataset_name = clean_dataset_name.split('.')[0]
 
     # check if the reward models are present either in the path or in the hub
     if training_args.reward_model_path is not None:
@@ -112,68 +111,79 @@ def main(
                     raise ValueError(f'Reward model not found at {reward_path}')
 
     # Task Loop
+    old_logprobs, old_rewards = None, None
+
     for i, dataset in enumerate(continual_dataset):
-        current_dataset_name: str = f'dataset-{i}'
-        training_args.output_dir = f'{output_dir}/{current_dataset_name}'
+        # Build custom repository name for this task
+        custom_repo_name = (
+            model.split('/')[-1] + '_' + clean_dataset_name + '_CPPO_' + str(i)
+        )
+        if training_args.push_to_hub:
+            training_args.hub_model_id = custom_repo_name
+        training_args.output_dir = os.path.join(output_dir, custom_repo_name)
 
-        # Load reward model if path provided
-        if training_args.reward_model_path is not None:
-            reward_model = AutoModelForSequenceClassification.from_pretrained(
-                training_args.reward_model_path + f'_{str(i)}', num_labels=1
-            )
-
-        trainer = ContinualDPOTrainer(
-            args=training_args,
-            processing_class=tokenizer,
-            model=model,
-            ref_model=ref_model,
-            reward_model=reward_model
-            if training_args.reward_model_path is not None
-            else None,
-            train_dataset=dataset[script_args.dataset_train_split],
-            eval_dataset=dataset[script_args.dataset_test_split]
-            if training_args.eval_strategy != 'no'
-            else None,
-            peft_config=peft_config,
+        # Load reward model based on naming convention (expects suffix with task index)
+        reward_model = AutoModelForSequenceClassification.from_pretrained(
+            training_args.reward_model_path + '_' + str(i), num_labels=1
         )
 
-        # TODO will throw Invalidate trace cache @ step 10: expected module 11, but got module 19
-        # https://github.com/deepspeedai/DeepSpeed/issues/6870
-        # Fix with deepspeed fix release
-        print('Training dataset:', current_dataset_name)
+        ################
+        # Training and Evaluation
+        ################
+        trainer = CPPOTrainer(
+            args=training_args,
+            processing_class=tokenizer,
+            model=policy,
+            ref_model=ref_policy,
+            reward_model=reward_model,
+            value_model=value_model,
+            train_dataset=dataset[script_args.dataset_train_split],
+            eval_dataset=dataset[script_args.dataset_test_split],
+            peft_config=peft_config,
+            old_logprobs=old_logprobs,
+            old_rewards=old_rewards,
+        )
+        # Set current task in trainer for task-based logging
+        trainer.set_task(f'task_{i}')
+
+        print(f'Training on task: {custom_repo_name}')
         trainer.train()
 
         if training_args.eval_strategy != 'no':
+            # Mark final evaluation for this task so metrics are logged under eval.last as well
+            trainer.mark_final_eval(True)
             metrics = trainer.evaluate()
+            trainer.mark_final_eval(False)
+
+            # Log dataset and task-specific metrics
             if i == 0:
                 trainer.log({'dataset': {'name': script_args.dataset_name}})
             metrics['dataset'] = i
-            # Log evaluation metrics under a hierarchy using slashes for wandb
-            print(f'eval/dataset/{i}')
+            print(f'Evaluation metrics for dataset {i}: {metrics}')
             trainer.log_metrics(f'eval/dataset/{i}', metrics)
-            trainer.save_metrics(f'eval', metrics)
-            wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
-            wb.log({f'task/{current_dataset_name}/last': metrics})  # type: ignore[attr-defined]
+            trainer.save_metrics('eval', metrics)
 
-        # Save and push to hub
-        trainer.save_model(os.path.join(training_args.output_dir, 'last'))
-        if training_args.push_to_hub:
+            # Log metrics to WandB
+            wb.log({'eval': {'last': metrics}})
+            wb.log({f'task/{custom_repo_name}/last': metrics})
+
+        # Save model checkpoint and optionally push
+        if not training_args.push_to_hub:
+            trainer.save_model(os.path.join(training_args.output_dir, 'last'))
+        else:
             trainer.push_to_hub(
-                dataset_name=(
-                    'Continual_DPO_' + script_args.dataset_name + '_' + str(i),
-                )
+                model_name=custom_repo_name,
+                dataset_name='CPPO_' + clean_dataset_name + '_' + str(i),
             )
 
-        # If using DeepSpeed through Accelerate, tear down the engine after training.
-        if hasattr(trainer, 'deepspeed') and trainer.deepspeed is not None:
-            # Remove reference to the DeepSpeed engine to allow proper cleanup.
-            del trainer.deepspeed
-        # Free cached GPU memory.
-        torch.cuda.empty_cache()
+        ref_policy = None
+        old_logprobs, old_rewards = trainer.old_logprobs, trainer.old_rewards
+
+    print('Training completed for all tasks!')
 
 
 if __name__ == '__main__':
-    dataclass_types = (ContinualDPOArguments, ContinualDPOConfig, ModelConfig)
+    dataclass_types = (CPPOArguments, CPPOConfig, ModelConfig)
     parser = TrlParser(dataclass_types)
     script_args, training_args, model_args = parser.parse_args_and_config()
     main(script_args, training_args, model_args)

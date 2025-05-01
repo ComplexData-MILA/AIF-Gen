@@ -5,7 +5,7 @@ This implementation extends the DPO trainer with Elastic Weight Consolidation (E
 ### Sync additional dependencies
 
 ```sh
-uv sync --group benchmarks.dpo
+uv sync --group benchmarks
 ```
 
 ## Run DPO with EWC

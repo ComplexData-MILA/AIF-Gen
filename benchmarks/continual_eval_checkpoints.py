@@ -4,6 +4,7 @@ import glob
 import os
 
 import torch
+import wandb as wb
 from dataloading import init_continual_dataset
 from datasets import Dataset
 from dpo.continual_dpo_trainer import (
@@ -26,8 +27,6 @@ from trl import (
     get_quantization_config,
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
-
-import wandb as wb
 
 
 def main(

@@ -1,3 +1,4 @@
+import copy
 import functools
 import gc
 import inspect
@@ -71,7 +72,7 @@ INVALID_LOGPROB = 1.0
 
 
 @dataclass
-class ContinualPPOArguments(ScriptArguments):
+class CPPOArguments(ScriptArguments):
     value_model_path: str = field(
         default='AIF-Gen/Qwen/Qwen2-0.5B-Reward/debug_REWARD',
         metadata={'help': 'Path to the value model or a HuggingFace model path.'},
@@ -101,7 +102,7 @@ class ContinualPPOArguments(ScriptArguments):
 
 
 @dataclass
-class ContinualPPOConfig(PPOConfig):
+class CPPOConfig(PPOConfig):
     mock: bool = field(
         default=False,
         metadata={'help': 'Whether to use mock dataset.'},
@@ -110,15 +111,20 @@ class ContinualPPOConfig(PPOConfig):
         default=False,
         metadata={'help': 'Whether to use greedy policy for evaluation.'},
     )
+    reg_coef: float = field(
+        default=0.1,
+        metadata={'help': 'CPPO knowledge retention regularization loss coefficient'},
+    )
 
 
-class ContinualPPOTrainer(PPOTrainer):
+class CPPOTrainer(PPOTrainer):
     # Shared accelerator instance across all trainer instances
     shared_accelerator: Optional[Accelerator] = None
     current_task_index: Optional[int] = None
     policy_value_models: Any  # the policy and value model wrapper
     ds_wrapped_models: Any  # TODO work with this after deepspeed is initialized
     accelerator: Accelerator  # now non-optional after creation
+    ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
 
     def __init__(
         self,
@@ -144,6 +150,8 @@ class ContinualPPOTrainer(PPOTrainer):
         ),
         callbacks: Optional[list[TrainerCallback]] = None,
         peft_config: Optional[dict] = None,
+        old_logprobs: Optional[Tensor] = None,
+        old_rewards: Optional[Tensor] = None,
     ):
         # Basic setup and validation
         if args is None:
@@ -167,18 +175,18 @@ class ContinualPPOTrainer(PPOTrainer):
         # Initialize task tracking
         self._stored_metrics: Dict = defaultdict(lambda: defaultdict(list))
         self.current_task = (
-            f'task_{ContinualPPOTrainer.current_task_index}'
-            if ContinualPPOTrainer.current_task_index is not None
+            f'task_{CPPOTrainer.current_task_index}'
+            if CPPOTrainer.current_task_index is not None
             else 'task_0'
         )
 
         # Set up task index tracking
         is_first_task = False
-        if ContinualPPOTrainer.current_task_index is None:
-            ContinualPPOTrainer.current_task_index = 0
+        if CPPOTrainer.current_task_index is None:
+            CPPOTrainer.current_task_index = 0
             is_first_task = True
         else:
-            ContinualPPOTrainer.current_task_index += 1
+            CPPOTrainer.current_task_index += 1
         self.is_final_eval = False
 
         # Store basic configuration
@@ -239,11 +247,22 @@ class ContinualPPOTrainer(PPOTrainer):
             else:
                 self.ref_model = create_reference_model(self.policy_model)
 
-            ContinualPPOTrainer.class_ref_model = self.ref_model
+            CPPOTrainer.class_ref_model = self.ref_model
 
         else:
             # For subsequent tasks, reuse the reference model
-            self.ref_model = ContinualPPOTrainer.class_ref_model
+            core_model = self.policy_value_models
+            if hasattr(core_model, 'policy'):
+                core_model = core_model.policy
+            elif hasattr(core_model, 'model'):
+                core_model = core_model.model
+            elif hasattr(core_model, 'policy_model'):
+                core_model = core_model.policy_model
+            else:
+                raise ValueError(
+                    'No policy attribute found - will not be able to generate'
+                )
+            self.ref_model = copy.deepcopy(core_model)
 
         # Always process new datasets for each task
         self.reward_model = reward_model
@@ -265,14 +284,14 @@ class ContinualPPOTrainer(PPOTrainer):
             args.total_episodes = int(args.num_train_epochs * self.train_dataset_len)
 
         # Setup accelerator - shared across all tasks
-        if ContinualPPOTrainer.shared_accelerator is None:
+        if CPPOTrainer.shared_accelerator is None:
             accelerator = Accelerator(
                 gradient_accumulation_steps=args.gradient_accumulation_steps
             )
             self.accelerator = accelerator
-            ContinualPPOTrainer.shared_accelerator = accelerator
+            CPPOTrainer.shared_accelerator = accelerator
         else:
-            self.accelerator = ContinualPPOTrainer.shared_accelerator
+            self.accelerator = CPPOTrainer.shared_accelerator
             self.gather_function = self.accelerator.gather_for_metrics
             if (
                 'use_gather_object'
@@ -334,11 +353,11 @@ class ContinualPPOTrainer(PPOTrainer):
 
             # Create policy and value model wrapper
             self.model = PolicyAndValueWrapper(self.policy_model, self.value_model)
-            ContinualPPOTrainer.policy_value_models = self.model
+            CPPOTrainer.policy_value_models = self.model
             self.model.config = self.policy_model.config  # needed for pushing to hub
         else:
             # Subsequent tasks: Reuse existing model
-            self.model = ContinualPPOTrainer.policy_value_models
+            self.model = CPPOTrainer.policy_value_models
             self.model.config = self.policy_model.config  # needed for pushing to hub
 
         # Always create optimizer and scheduler for each task
@@ -406,14 +425,14 @@ class ContinualPPOTrainer(PPOTrainer):
             self.model, self.optimizer, self.dataloader = self.accelerator.prepare(
                 self.model, self.optimizer, self.dataloader
             )
-            ContinualPPOTrainer.ds_wrapped_models = self.model
+            CPPOTrainer.ds_wrapped_models = self.model
         else:
             # For subsequent tasks, only prepare optimizer and dataloader
             self.optimizer, self.dataloader = self.accelerator.prepare(
                 self.optimizer, self.dataloader
             )
             # Reuse the model from the first task
-            self.model = ContinualPPOTrainer.ds_wrapped_models
+            self.model = CPPOTrainer.ds_wrapped_models
 
         torch.manual_seed(self.local_seed)  # Reset local seed
 
@@ -450,10 +469,10 @@ class ContinualPPOTrainer(PPOTrainer):
                     args.fp16,
                     args.bf16,
                 )
-                ContinualPPOTrainer.class_ref_model = self.ref_model
+                CPPOTrainer.class_ref_model = self.ref_model
             else:
                 # Reuse prepared ref_model on subsequent tasks
-                self.ref_model = ContinualPPOTrainer.class_ref_model
+                self.ref_model = CPPOTrainer.class_ref_model
         else:
             # Non-DeepSpeed path
             if self.ref_model is None:
@@ -464,13 +483,16 @@ class ContinualPPOTrainer(PPOTrainer):
             elif is_first_task:
                 # Only move ref_model to device on first task
                 self.ref_model = self.ref_model.to(self.accelerator.device)  # type: ignore
-                ContinualPPOTrainer.class_ref_model = self.ref_model
+                CPPOTrainer.class_ref_model = self.ref_model
             else:
                 # Reuse ref_model on subsequent tasks
-                self.ref_model = ContinualPPOTrainer.class_ref_model
+                self.ref_model = CPPOTrainer.class_ref_model
 
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
+
+        self.old_logprobs = old_logprobs
+        self.old_rewards = old_rewards
 
     def train(self) -> None:
         """Override train method to preserve reference model."""
@@ -562,6 +584,7 @@ class ContinualPPOTrainer(PPOTrainer):
                 responses: Union[List[Tensor], Tensor] = []
                 postprocessed_responses: Union[List[Tensor], Tensor] = []
                 logprobs: Union[List[Tensor], Tensor] = []
+                mask: Union[List[Tensor], Tensor] = []
                 ref_logprobs: Union[List[Tensor], Tensor] = []
                 scores: Union[List[Tensor], Tensor] = []
                 sequence_lengths: Union[List[Tensor], Tensor] = []
@@ -589,6 +612,11 @@ class ContinualPPOTrainer(PPOTrainer):
                     response = query_response[:, context_length:]
                     logits = logitss[i : i + args.local_rollout_forward_batch_size]
                     logprob = selective_log_softmax(logits, response)
+                    tensor_mask = (
+                        response.ne(processing_class.pad_token_id)
+                        .long()
+                        .to(accelerator.device)
+                    )  # portion of mask for single tensor
                     del logits
                     torch.cuda.empty_cache()
 
@@ -645,6 +673,7 @@ class ContinualPPOTrainer(PPOTrainer):
                     responses.append(response)
                     postprocessed_responses.append(postprocessed_response)
                     logprobs.append(logprob)
+                    mask.append(tensor_mask)
                     ref_logprobs.append(ref_logprob)
                     sequence_lengths.append(sequence_length)
                     scores.append(score)
@@ -656,6 +685,7 @@ class ContinualPPOTrainer(PPOTrainer):
                 sequence_lengths = torch.cat(sequence_lengths, 0)
                 scores = torch.cat(scores, 0)
                 values = torch.cat(values, 0)
+                full_mask = torch.cat(mask, 0)
                 del (logprob, full_value, value, score)
                 torch.cuda.empty_cache()
                 gc.collect()
@@ -716,7 +746,13 @@ class ContinualPPOTrainer(PPOTrainer):
                 advantages = torch.masked_fill(advantages, padding_mask, 0)
                 torch.cuda.empty_cache()
 
-            # Do multiple epochs of PPO training, with a fresh random shuffle in each epoch
+                coef_learn, coef_reg = None, None
+                if self.old_logprobs is not None:
+                    coef_learn, coef_reg = get_cppo_plasticity_weights(
+                        self.old_logprobs, self.old_rewards, full_mask
+                    )
+
+            # Do multiple epochs of CPPO training, with a fresh random shuffle in each epoch
             for ppo_epoch_idx in range(args.num_ppo_epochs):
                 b_inds = np.random.permutation(args.local_batch_size)
                 minibatch_idx = 0
@@ -766,13 +802,25 @@ class ContinualPPOTrainer(PPOTrainer):
                             vf_losses1 = torch.square(vpred - mb_return)
                             vf_losses2 = torch.square(vpredclipped - mb_return)
                             vf_loss_max = torch.max(vf_losses1, vf_losses2)
-                            vf_loss = 0.5 * masked_mean(
-                                vf_loss_max, ~padding_mask_p1[micro_batch_inds]
-                            )
+
+                            micro_mask = (
+                                ~padding_mask[micro_batch_inds]
+                            ).float()  # will be bools -> float
+                            vf_loss = 0.5 * masked_mean(vf_loss_max, micro_mask)
                             vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(),
-                                ~padding_mask_p1[micro_batch_inds],
+                                (vf_losses2 > vf_losses1).float(), micro_mask
                             )
+
+                            def _get_mask(coef: Optional[Tensor]) -> Tensor:
+                                if coef is None:
+                                    return micro_mask
+                                _mask = torch.matmul(
+                                    torch.diag(coef[micro_batch_inds]), micro_mask
+                                )
+                                return micro_mask if _mask.sum() == 0 else _mask
+
+                            mask_alpha = _get_mask(coef_learn)
+                            mask_beta = _get_mask(coef_reg)
                             logprobs_diff = new_logprobs - mb_logprobs
                             ratio = torch.exp(logprobs_diff)
                             pg_losses = -mb_advantage * ratio
@@ -780,17 +828,17 @@ class ContinualPPOTrainer(PPOTrainer):
                                 ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
                             )
                             pg_loss_max = torch.max(pg_losses, pg_losses2)
-                            pg_loss = masked_mean(
-                                pg_loss_max, ~padding_mask[micro_batch_inds]
-                            )
+                            pg_loss = masked_mean(pg_loss_max, mask_alpha)
                             loss = pg_loss + args.vf_coef * vf_loss
+                            loss += args.reg_coef * masked_mean(
+                                logprobs_diff.square(), mask_beta
+                            )
                             accelerator.backward(loss)
                             optimizer.step()
                             optimizer.zero_grad()
                             with torch.no_grad():
                                 pg_clipfrac = masked_mean(
-                                    (pg_losses2 > pg_losses).float(),
-                                    ~padding_mask[micro_batch_inds],
+                                    (pg_losses2 > pg_losses).float(), mask_alpha
                                 )
                                 prob_dist = torch.nn.functional.softmax(logits, dim=-1)
                                 entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
@@ -844,6 +892,7 @@ class ContinualPPOTrainer(PPOTrainer):
                     )
                     # fmt: on
                     torch.cuda.empty_cache()
+
             with torch.no_grad():
                 mean_kl = kl.sum(1).mean()
                 mean_entropy = (-logprobs).sum(1).mean()
@@ -933,7 +982,9 @@ class ContinualPPOTrainer(PPOTrainer):
                 self.generate_completions(sampling=True)
                 torch.cuda.empty_cache()
 
-            # Don't delete ref_logprobs here
+            self.old_logprobs = logprobs.clone().detach()
+            self.old_rewards = rewards.clone().detach()
+
             del (
                 query_responses,
                 responses,
@@ -968,15 +1019,15 @@ class ContinualPPOTrainer(PPOTrainer):
         if self.ref_model is None and original_ref_model is not None:
             print('Reference model was cleared during training - restoring')
             self.ref_model = original_ref_model
-            ContinualPPOTrainer.class_ref_model = original_ref_model
+            CPPOTrainer.class_ref_model = original_ref_model
 
         # Ensure the class variable is updated
-        ContinualPPOTrainer.class_ref_model = self.ref_model
+        CPPOTrainer.class_ref_model = self.ref_model
         if self.is_deepspeed_enabled:
-            ContinualPPOTrainer.ds_wrapped_models = self.deepspeed
+            CPPOTrainer.ds_wrapped_models = self.deepspeed
         else:
-            ContinualPPOTrainer.ds_wrapped_models = self.model
-        ContinualPPOTrainer.policy_value_models = self.model
+            CPPOTrainer.ds_wrapped_models = self.model
+        CPPOTrainer.policy_value_models = self.model
 
     def evaluate(self) -> Dict[str, float]:
         """Custom evaluation method for PPO. Generates completions from the evaluation dataloader,
@@ -1179,12 +1230,12 @@ class ContinualPPOTrainer(PPOTrainer):
         else:  # transformers<=4.46
             return Trainer.log(self, logs)
 
-    def set_task(self, task_name: str) -> 'ContinualPPOTrainer':
+    def set_task(self, task_name: str) -> 'CPPOTrainer':
         """Set the current task name for better metric organization."""
         self.current_task = task_name
         return self
 
-    def mark_final_eval(self, is_final: bool = True) -> 'ContinualPPOTrainer':
+    def mark_final_eval(self, is_final: bool = True) -> 'CPPOTrainer':
         """Mark that the next evaluation will be the final one for the current task."""
         self.is_final_eval = is_final
         return self
@@ -1215,3 +1266,68 @@ class ContinualPPOTrainer(PPOTrainer):
 
         # Restore the original model
         self.model = original_model
+
+
+def get_cppo_plasticity_weights(
+    old_logprobs: Tensor,
+    old_rewards: Tensor,
+    mask: Tensor,
+    threshold: float = 0.5,
+    ub: float = 2.0,
+    lb: float = 0.2,
+) -> tuple[Tensor, Tensor]:
+    """Compute the CPPO plasticity weights for a batch of data using 'balance' heuristic method.
+
+    Args:
+        old_logprobs (Tensor): [B, response_size] tensor of old log probabilities.
+        old_rewards (Tensor): [B, response_size] tensor of old rewards.
+        mask (Tensor): Mask tensor indicating valid positions.
+        threshold (float): Threshold for detection.
+        ub (float): Upper bound on coefficient weights.
+        lb (float): Lower bound on coefficient weights.
+
+    Returns:
+        Tuple[Tensor, Tensor]: Coefficients for learning and regularization.
+    """
+    logp_mean = old_logprobs.mean(dim=-1)
+    logp_std = old_logprobs.std(dim=-1)
+    rewards_mean = old_rewards.mean(dim=-1)
+    rewards_std = old_rewards.std(dim=-1)
+
+    N = old_logprobs.shape[0]
+    device = old_logprobs.device
+
+    coef_learn = torch.ones_like(old_logprobs[:, 0])
+    coef_reg = torch.ones_like(old_logprobs[:, 0])
+    length = mask.sum(dim=-1) - 1
+
+    threshold11 = (rewards_mean + threshold * rewards_std).to(device)
+    threshold12 = (rewards_mean - threshold * rewards_std).to(device)
+    threshold21 = (logp_mean + threshold * logp_std).to(device)
+    threshold22 = (logp_mean - threshold * logp_std).to(device)
+
+    last_reward = torch.gather(old_rewards, dim=-1, index=length.unsqueeze(-1)).squeeze(
+        -1
+    )
+    cond11 = last_reward > threshold11
+    cond12 = last_reward < threshold12
+    cond21 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) > threshold21
+    cond22 = (old_logprobs * mask).sum(dim=-1) / mask.sum(dim=-1) < threshold22
+
+    for i in range(N):
+        if cond11[i] and cond21[i]:  # high retention & high learning
+            coef_learn[i] = ub
+            coef_reg[i] = ub
+        elif cond11[i] and cond22[i]:  # normal retention & high learning
+            coef_learn[i] = ub
+            coef_reg[i] = lb
+        elif cond12[i] and cond21[i]:  # low retention & high learning
+            coef_learn[i] = ub
+            coef_reg[i] = lb
+        elif cond12[i] and cond22[i]:  # low retention & low learning
+            coef_learn[i] = lb
+            coef_reg[i] = lb
+
+    coef_learn = coef_learn.to(device)
+    coef_reg = coef_reg.to(device)
+    return coef_learn, coef_reg

@@ -8,12 +8,12 @@ This repository adapts TRL for continual learning. The commands below use a cons
 uv sync --group benchmarks
 ```
 
-## Run PPO
+## Run CPPO
 
 ### Using uv run (vanilla Python with PEFT)
 
 ```sh
-uv run benchmarks/ppo/ppo_continual.py \
+uv run benchmarks/cppo/cppo.py \
     --dataset_name benchmarks/continual_data_debug.json \
     --sft_model_path Qwen/Qwen2-0.5B-Instruct \
     --value_model_path Shahradmz/Qwen2-0.5B-Instruct_continual_data_debug_REWARD_0 \
@@ -27,7 +27,7 @@ uv run benchmarks/ppo/ppo_continual.py \
     --eval_steps 20 \
     --save_steps 20 \
     --bf16 \
-    --output_dir "$SCRATCH/Qwen2-0.5B-PPO-test" \
+    --output_dir "$SCRATCH/Qwen2-0.5B-CPPO-test" \
     --no_remove_unused_columns \
     --use_peft \
     --lora_r 32 \
@@ -37,12 +37,12 @@ uv run benchmarks/ppo/ppo_continual.py \
 
 ### Using accelerate launch (with DeepSpeed / multi-GPU)
 
-- Please note that our implementation only works with DeepSpeed and Zero2. The configuration file `benchmarks/ppo/accelerate_configs/deepspeed_zero2.yaml` is provided for this purpose.
+- Please note that our implementation only works with DeepSpeed and Zero2. The configuration file `benchmarks/cppo/accelerate_configs/deepspeed_zero2.yaml` is provided for this purpose.
   We will add support for other configurations in the future.
 
 ```sh
-accelerate launch --config_file benchmarks/ppo/accelerate_configs/deepspeed_zero2.yaml \
-    benchmarks/ppo/ppo_continual.py \
+accelerate launch --config_file benchmarks/cppo/accelerate_configs/deepspeed_zero2.yaml \
+    benchmarks/cppo/cppo_continual.py \
     --dataset_name benchmarks/continual_data_debug.json \
     --sft_model_path Qwen/Qwen2-0.5B-Instruct \
     --value_model_path Shahradmz/Qwen2-0.5B-Instruct_continual_data_debug_REWARD_0 \
@@ -57,7 +57,7 @@ accelerate launch --config_file benchmarks/ppo/accelerate_configs/deepspeed_zero
     --eval_steps 5 \
     --save_steps 5 \
     --bf16 \
-    --output_dir "$SCRATCH/Qwen2-0.5B-PPO-test" \
+    --output_dir "$SCRATCH/Qwen2-0.5B-CPPO-test" \
     --no_remove_unused_columns \
     --use_peft \
     --lora_r 32 \
@@ -70,7 +70,7 @@ accelerate launch --config_file benchmarks/ppo/accelerate_configs/deepspeed_zero
 ### Full Training (without PEFT push, for local evaluation)
 
 ```sh
-uv run benchmarks/ppo/ppo_continual.py \
+uv run benchmarks/cppo/cppo_continual.py \
     --dataset_name benchmarks/continual_data_debug.json \
     --mock False \
     --sft_model_path Qwen/Qwen2-0.5B-Instruct \
@@ -84,7 +84,7 @@ uv run benchmarks/ppo/ppo_continual.py \
     --logging_steps 20 \
     --eval_strategy steps \
     --eval_steps 20 \
-    --output_dir "$SCRATCH/Qwen2-0.5B-PPO" \
+    --output_dir "$SCRATCH/Qwen2-0.5B-CPPO" \
     --no_remove_unused_columns
 ```
 
@@ -93,7 +93,7 @@ uv run benchmarks/ppo/ppo_continual.py \
 First, create the sweep:
 
 ```sh
-wandb sweep sweep_configs/ppo_sweep.yaml    # This will output the SWEEP_ID
+wandb sweep sweep_configs/cppo_sweep.yaml    # This will output the SWEEP_ID
 ```
 
 Then, run the agent:

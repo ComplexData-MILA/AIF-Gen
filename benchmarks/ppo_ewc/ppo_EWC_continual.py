@@ -3,6 +3,7 @@
 import os
 
 import torch
+import wandb as wb
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -18,7 +19,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 from benchmarks.ppo_ewc.continual_ppo_EWC_trainer import (
     ContinualPPOEWCArguments,
