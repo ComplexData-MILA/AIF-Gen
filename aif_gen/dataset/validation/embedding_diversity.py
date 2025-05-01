@@ -194,9 +194,7 @@ async def _batch_embed(
     return embeddings, extra_data
 
 
-def _cosine_similarity_matrix_self_transpose(
-    matrix: np.ndarray, exclude_self: bool = False
-) -> np.ndarray:
+def _cosine_similarity_matrix_self_transpose(matrix: np.ndarray) -> np.ndarray:
     """Return the average cosine similarity for each row with all rows of the matrix.
 
     This function normalizes each row and then computes the average cosine similarity.
@@ -205,8 +203,6 @@ def _cosine_similarity_matrix_self_transpose(
 
     Args:
         matrix (np.ndarray): A 2D NumPy array of shape (n, m).
-        exclude_self (bool): If True, the self-similarity (always 1 for nonzero rows)
-                             is excluded from the average. Default is False (include self).
 
     Returns:
         np.ndarray: A 1D array of shape (n,) containing the average cosine similarity for each row.
@@ -223,13 +219,7 @@ def _cosine_similarity_matrix_self_transpose(
     n = matrix.shape[0]
 
     # Compute average cosine similarity for each row
-    if not exclude_self:
-        # Including self-similarity: each row's average is (dot(u_i, sum_normalized)) / n.
-        avg_similarity = normalized_matrix.dot(sum_normalized) / n
-    else:
-        # Excluding self-similarity: subtract the self dot product (which is 1) and divide by (n - 1)
-        avg_similarity = (normalized_matrix.dot(sum_normalized) - 1) / (n - 1)
-
+    avg_similarity = normalized_matrix.dot(sum_normalized) / n
     return avg_similarity
 
 
@@ -237,10 +227,7 @@ def _compute_statistics(results: Dict[str, List[List[float]]]) -> Dict[str, floa
     statistics: Dict[str, float] = {}
     for metric, values in results.items():
         embeddings = np.asarray(values)  # (dataset, embed_dim)
-
-        # (dataset, dataset)
-        similarity_pairwise = _cosine_similarity_matrix_self_transpose(embeddings)
-        similarity = similarity_pairwise.mean(axis=-1)  # (dataset,)
+        similarity = _cosine_similarity_matrix_self_transpose(embeddings)  # (dataset,)
         diversity: np.ndarray = 1 - similarity
 
         statistics[f'{metric}_mean'] = float(np.mean(diversity))
