@@ -685,7 +685,7 @@ class CPPOTrainer(PPOTrainer):
                 sequence_lengths = torch.cat(sequence_lengths, 0)
                 scores = torch.cat(scores, 0)
                 values = torch.cat(values, 0)
-                mask = torch.cat(mask, 0)
+                full_mask = torch.cat(mask, 0)
                 del (logprob, full_value, value, score)
                 torch.cuda.empty_cache()
                 gc.collect()
@@ -749,7 +749,7 @@ class CPPOTrainer(PPOTrainer):
                 coef_learn, coef_reg = None, None
                 if self.old_logprobs is not None:
                     coef_learn, coef_reg = get_cppo_plasticity_weights(
-                        self.old_logprobs, self.old_rewards, mask
+                        self.old_logprobs, self.old_rewards, full_mask
                     )
 
             # Do multiple epochs of CPPO training, with a fresh random shuffle in each epoch
@@ -803,17 +803,21 @@ class CPPOTrainer(PPOTrainer):
                             vf_losses2 = torch.square(vpredclipped - mb_return)
                             vf_loss_max = torch.max(vf_losses1, vf_losses2)
 
-                            mask = ~padding_mask[micro_batch_inds]
-                            vf_loss = 0.5 * masked_mean(vf_loss_max, mask)
+                            micro_mask = (
+                                ~padding_mask[micro_batch_inds]
+                            ).float()  # will be bools -> float
+                            vf_loss = 0.5 * masked_mean(vf_loss_max, micro_mask)
                             vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(), mask
+                                (vf_losses2 > vf_losses1).float(), micro_mask
                             )
 
                             def _get_mask(coef: Optional[Tensor]) -> Tensor:
                                 if coef is None:
-                                    return mask
-                                _mask = mask * coef[micro_batch_inds].unsqueeze(1)
-                                return mask if _mask.sum() == 0 else _mask
+                                    return micro_mask
+                                _mask = torch.matmul(
+                                    torch.diag(coef[micro_batch_inds]), micro_mask
+                                )
+                                return micro_mask if _mask.sum() == 0 else _mask
 
                             mask_alpha = _get_mask(coef_learn)
                             mask_beta = _get_mask(coef_reg)
