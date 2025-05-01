@@ -88,21 +88,21 @@ async def llm_embedding_diversity(
                 client=client,
                 model_name=model_name,
                 async_semaphore=async_semaphore,
-                extra_data='prompt',
+                extra_data={'dataset_idx': dataset_idx, 'text_type': 'prompt'},
             )
             embed_chosen_coro = _batch_embed(
                 chosen,
                 client=client,
                 model_name=model_name,
                 async_semaphore=async_semaphore,
-                extra_data='chosen',
+                extra_data={'dataset_idx': dataset_idx, 'text_type': 'chosen'},
             )
             embed_rejected_coro = _batch_embed(
                 rejected,
                 client=client,
                 model_name=model_name,
                 async_semaphore=async_semaphore,
-                extra_data='rejected',
+                extra_data={'dataset_idx': dataset_idx, 'text_type': 'rejected'},
             )
             futures.append(asyncio.create_task(embed_prompt_coro))
             futures.append(asyncio.create_task(embed_chosen_coro))
@@ -117,7 +117,8 @@ async def llm_embedding_diversity(
             if result is None:
                 continue
 
-            embeddings, text_type = result
+            embeddings, extra_data = result
+            dataset_idx, text_type = extra_data['dataset_idx'], extra_data['text_type']
             results[dataset_idx][text_type].extend(embeddings)
 
         aggregated_results: List[Optional[Dict[str, float]]] = []
