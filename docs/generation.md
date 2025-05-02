@@ -6,13 +6,13 @@
 
 #### Prompt Mapper
 
-::: aif_gen.generate.prompt_mapper.base.PromptMapperBase
-::: aif_gen.generate.prompt_mapper.prompt_mapper.PromptMapper
+::: aif_gen.generate.mappers.base.PromptMapperBase
+::: aif_gen.generate.mappers.prompt_mapper.PromptMapper
 
 #### Response Mapper
 
-::: aif_gen.generate.response_mapper.base.ResponseMapperBase
-::: aif_gen.generate.response_mapper.response_mapper.ResponseMapper
+::: aif_gen.generate.mappers.base.ResponseMapperBase
+::: aif_gen.generate.mappers.response_mapper.ResponseMapper
 
 ### Caching
 
