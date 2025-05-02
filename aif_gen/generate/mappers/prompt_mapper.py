@@ -5,7 +5,7 @@ import numpy as np
 
 from aif_gen.task import AlignmentTask
 
-from .base import PromptMapperBase
+from .base import ETHICAL_GUIDELINES, PromptMapperBase
 
 
 class PromptMapper(PromptMapperBase):
@@ -16,17 +16,14 @@ class PromptMapper(PromptMapperBase):
 
     Args:
         max_seed_word_samples (int): Maximum number of seed words to sample across all domain components (default=2)
-        suffix_context (Optional[str]=None): Optionally add arbitrary context at the end of the generated prompt.
+        suffix_context (Optional[str]=None): Optional suffix text to add at the end of the generated prompt.
     """
 
     def __init__(
         self, max_seed_word_samples: int = 2, suffix_context: Optional[str] = None
     ) -> None:
         if max_seed_word_samples <= 0:
-            raise ValueError(
-                f'Max seed word samples must be positive, got: {max_seed_word_samples}'
-            )
-
+            raise ValueError(f'Got negative seed word samples: {max_seed_word_samples}')
         self._max_seed_word_samples = max_seed_word_samples
         self._suffix_context = suffix_context
 
@@ -39,11 +36,10 @@ class PromptMapper(PromptMapperBase):
         Do not include any meta commentary, instructions, or extra text (e.g., avoid phrases like "User asks" or additional context).
         The output should be clear and self-contained.
         You don't need to start by saying "prompt:".
-        {self.ETHICAL_GUIDELINES}
+        {ETHICAL_GUIDELINES}
         """
         if self.suffix_context:
             prompt += self.suffix_context
-
         prompt = dedent(prompt)
         return prompt
 
@@ -66,13 +62,11 @@ class PromptMapper(PromptMapperBase):
 
         # Arange the list of all *combined* seed words across all components, along with their net
         # sample probability. The sample probability of a seed words is uniform *within* each component.
-        # Note: Seed words may appear in distinct domain components.
         seed_words, sample_probs = [], []
         for i, component in enumerate(domain.components):
             seed_words += component.seed_words
-            sample_probs += [component_weights[i] / len(component.seed_words)] * len(
-                component.seed_words
-            )
+            num_seed_words = len(component.seed_words)
+            sample_probs += [component_weights[i] / num_seed_words] * num_seed_words
 
         sample_size = min(len(seed_words), self.max_seed_word_samples)
         sampled_indices = np.random.choice(

@@ -12,14 +12,13 @@ import openai
 import pydantic
 from tqdm.asyncio import tqdm
 
-from aif_gen.api.prompt_mapper import PromptMapper
-from aif_gen.api.response_mapper import ResponseMapper
 from aif_gen.dataset import (
     AlignmentDataset,
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
 from aif_gen.generate.caching import AsyncElasticsearchCache
+from aif_gen.generate.mappers import PromptMapper, ResponseMapper
 from aif_gen.task.alignment_task import AlignmentTask
 
 
@@ -513,7 +512,7 @@ async def _generate_sample_with_preference_axes(
         # generate a list of randomly generated scores each between 1 and 5
         scores = [
             random.randint(1, 5)
-            for _ in range(response_mapper.NUMBER_OF_PREFERENCE_AXES_SAMPLED)
+            for _ in range(response_mapper.NUM_PREFERENCE_AXES_SAMPLES)
         ]
         task_prompt = response_mapper.generate_no_preference_prompt(
             task,
