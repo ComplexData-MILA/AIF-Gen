@@ -11,7 +11,7 @@ def upload_to_hf(repo_id: str, local_path: str | pathlib.Path) -> None:
         repo_id (str): The name of the HuggingFace dataset repository.
         local_path (Union[str, pathlib.Path]): Local path to upload, either a single file, or directory.
 
-    Note: Assumes the client is authenticed.
+    Note: Assumes the client is authenticated.
     """
     local_path = pathlib.Path(local_path)
 
@@ -50,7 +50,7 @@ def download_from_hf(repo_id: str, filename: str | pathlib.Path) -> pathlib.Path
     Returns:
         Absolute path on the local filesystem where the data was downloaded.
 
-    Note: Assumes the client is authenticed.
+    Note: Assumes the client is authenticated.
     """
     if isinstance(filename, pathlib.Path):
         filename = str(filename)
