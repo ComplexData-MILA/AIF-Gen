@@ -45,18 +45,11 @@ def _count_validation(
     dataset: AlignmentDataset, remove_stop_words: bool
 ) -> Dict[str, int]:
     samples, prompts, chosen, rejected = set(), set(), set(), set()
-
     for sample in dataset.samples:
-        sample_str = rsw(str(sample)) if remove_stop_words else str(sample)
-        prompt_str = rsw(sample.prompt) if remove_stop_words else sample.prompt
-        chosen_str = rsw(sample.chosen) if remove_stop_words else sample.chosen
-        rejected_str = rsw(sample.rejected) if remove_stop_words else sample.rejected
-
-        samples.add(sample_str)
-        prompts.add(prompt_str)
-        chosen.add(chosen_str)
-        rejected.add(rejected_str)
-
+        samples.add(rsw(str(sample)) if remove_stop_words else str(sample))
+        prompts.add(rsw(sample.prompt) if remove_stop_words else sample.prompt)
+        chosen.add(rsw(sample.chosen) if remove_stop_words else sample.chosen)
+        rejected.add(rsw(sample.rejected) if remove_stop_words else sample.rejected)
     return {
         'sample': dataset.num_samples,
         'unique_samples': len(samples),

@@ -25,7 +25,6 @@ def test_entropy_validation_all_unique():
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5232109529528914,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -50,7 +49,6 @@ def test_entropy_validation_all_same_prompts():
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5024938932551737,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -75,7 +73,6 @@ def test_entropy_validation_all_same_responses():
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.496481079820755,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -100,7 +97,6 @@ def test_entropy_validation_all_same_everything():
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.3034884952192693,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -119,7 +115,6 @@ def test_entropy_validation_no_response_entropy():
             'chosen_entropy': -0.0,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': -0.0,
-            'token_entropy': 2.289294054503374,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -144,7 +139,6 @@ def test_entropy_validation_no_prompt_entropy():
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': -0.0,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.465931856301205,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -246,37 +240,31 @@ def test_entropy_countinual_dataset():
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5232109529528914,
         },
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5024938932551737,
         },
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.496481079820755,
         },
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.3034884952192693,
         },
         {
             'chosen_entropy': -0.0,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': -0.0,
-            'token_entropy': 2.289294054503374,
         },
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': -0.0,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.465931856301205,
         },
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -301,7 +289,6 @@ def test_entropy_validation_stop_words_removed():
             'chosen_entropy': 1.0986122886681096,
             'prompt_entropy': 1.0986122886681096,
             'rejected_entropy': 1.0986122886681096,
-            'token_entropy': 2.253857589601352,
         }
     ]
     assert entropy_validation(dataset, remove_stop_words=True) == expected_entropy
