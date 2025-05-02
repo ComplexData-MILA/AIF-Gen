@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import pathlib
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 from datasets import Dataset
 from pydantic.dataclasses import dataclass
@@ -36,8 +36,8 @@ class ContinualAlignmentDataset:
         return self.num_samples
 
     def __getitem__(
-        self, key: Union[slice, int]
-    ) -> Union[AlignmentDatasetSample, List[AlignmentDatasetSample]]:
+        self, key: slice | int
+    ) -> AlignmentDatasetSample | List[AlignmentDatasetSample]:
         # Indexing based on **samples** across datasets (not into datasets themselves)
         all_samples = []  # This should probably be cached
         for dataset in self.datasets:
@@ -72,7 +72,7 @@ class ContinualAlignmentDataset:
         for dataset in datasets:
             self.append(dataset)
 
-    def to_json(self, file_path: Union[str, pathlib.Path]) -> None:
+    def to_json(self, file_path: str | pathlib.Path) -> None:
         r"""Save the ContinualAlignmentDataset to a json file.
 
         Note: Uses to_dict() under the hood to get a dictionary representation.
@@ -96,9 +96,7 @@ class ContinualAlignmentDataset:
         return dataset_dict
 
     @classmethod
-    def from_json(
-        cls, file_path: Union[str, pathlib.Path]
-    ) -> 'ContinualAlignmentDataset':
+    def from_json(cls, file_path: str | pathlib.Path) -> 'ContinualAlignmentDataset':
         r"""Load the ContinualAlignmentDataset from a json file.
 
         Note: Uses ContinualAlignmentDataset.from_dict() under the hood to parse the representation.
