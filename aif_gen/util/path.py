@@ -1,17 +1,17 @@
 import datetime
-import pathlib
 import subprocess
 
 
-def get_root_dir() -> pathlib.Path:
-    return pathlib.Path(__file__).parent.parent.parent
-
-
-def get_cwd() -> pathlib.Path:
-    return pathlib.Path.cwd()
-
-
 def get_run_id(name: str = 'aif_data') -> str:
+    r"""Create a unique identifier associated with an experiment.
+
+    Args:
+        name (str): Prefix string associated with the run identifier.
+
+    Returns:
+        A run id of the form: {name}/{time}_{git_hash}
+    """
+
     def get_git_revision_short_hash() -> str:
         return (
             subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'])
