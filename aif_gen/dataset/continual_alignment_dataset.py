@@ -96,7 +96,7 @@ class ContinualAlignmentDataset:
         return dataset_dict
 
     @classmethod
-    def from_json(cls, file_path: str | pathlib.Path) -> 'ContinualAlignmentDataset':
+    def from_json(cls, file_path: str | pathlib.Path) -> ContinualAlignmentDataset:
         r"""Load the ContinualAlignmentDataset from a json file.
 
         Note: Uses ContinualAlignmentDataset.from_dict() under the hood to parse the representation.
