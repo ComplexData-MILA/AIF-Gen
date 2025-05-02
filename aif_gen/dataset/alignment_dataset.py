@@ -14,7 +14,7 @@ from aif_gen.task import AlignmentTask
 from .alignment_sample import AlignmentDatasetSample
 
 
-@dataclass
+@dataclass(slots=True)
 class AlignmentDataset:
     r"""Container object for an Alignment Dataset.
 
