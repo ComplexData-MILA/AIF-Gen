@@ -9,6 +9,8 @@ from aif_gen.dataset import (
     ContinualAlignmentDataset,
 )
 from aif_gen.dataset.validation.llm_judge import llm_judge_validation
+from aif_gen.task.alignment_task import AlignmentTask
+from aif_gen.task.domain import Domain
 
 _EXP_KEYS = [
     'alignment_max',
@@ -107,14 +109,21 @@ def mock_model():
     return 'GPT-1337'
 
 
+@pytest.fixture
+def mock_task():
+    return AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
+
+
 @pytest.mark.asyncio
-async def test_llm_judge_validation(mock_model, mock_client, mock_semaphore):
+async def test_llm_judge_validation(mock_model, mock_client, mock_semaphore, mock_task):
     samples = [
         AlignmentDatasetSample(
             'Mock prompt A', 'Winning Response A 1', 'Losing Response A 1'
         ),
     ]
-    dataset = AlignmentDataset(task=None, samples=samples)
+    dataset = AlignmentDataset(task=mock_task, samples=samples)
     result = await llm_judge_validation(
         dataset, mock_model, mock_client, mock_semaphore
     )
@@ -126,9 +135,9 @@ async def test_llm_judge_validation(mock_model, mock_client, mock_semaphore):
 
 @pytest.mark.asyncio
 async def test_llm_judge_validation_empty_dataset(
-    mock_model, mock_client, mock_semaphore
+    mock_model, mock_client, mock_semaphore, mock_task
 ):
-    dataset = AlignmentDataset(task=None, samples=[])
+    dataset = AlignmentDataset(task=mock_task, samples=[])
     result = await llm_judge_validation(
         dataset, mock_model, mock_client, mock_semaphore
     )
@@ -137,7 +146,7 @@ async def test_llm_judge_validation_empty_dataset(
 
 @pytest.mark.asyncio
 async def test_llm_judge_validation_continual_dataset(
-    mock_model, mock_client, mock_semaphore
+    mock_model, mock_client, mock_semaphore, mock_task
 ):
     samples = [
         AlignmentDatasetSample(
@@ -150,8 +159,8 @@ async def test_llm_judge_validation_continual_dataset(
             'Mock prompt', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    dataset1 = AlignmentDataset(task=None, samples=samples)
-    dataset2 = AlignmentDataset(task=None, samples=[])
+    dataset1 = AlignmentDataset(task=mock_task, samples=samples)
+    dataset2 = AlignmentDataset(task=mock_task, samples=[])
     dataset = ContinualAlignmentDataset(datasets=[dataset1, dataset2])
 
     result = await llm_judge_validation(
@@ -167,7 +176,7 @@ async def test_llm_judge_validation_continual_dataset(
 
 @pytest.mark.asyncio
 async def test_llm_judge_validation_with_parse_failures(
-    mock_model, mock_client_schema_parse_exception, mock_semaphore
+    mock_model, mock_client_schema_parse_exception, mock_semaphore, mock_task
 ):
     samples = [
         AlignmentDatasetSample(
@@ -180,7 +189,7 @@ async def test_llm_judge_validation_with_parse_failures(
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    dataset = AlignmentDataset(task=None, samples=samples)
+    dataset = AlignmentDataset(task=mock_task, samples=samples)
 
     result = await llm_judge_validation(
         dataset, mock_model, mock_client_schema_parse_exception, mock_semaphore
@@ -194,7 +203,7 @@ async def test_llm_judge_validation_with_parse_failures(
 
 @pytest.mark.asyncio
 async def test_llm_judge_validation_uncaught_exception(
-    mock_model, mock_client_uncaught_exception, mock_semaphore
+    mock_model, mock_client_uncaught_exception, mock_semaphore, mock_task
 ):
     samples = [
         AlignmentDatasetSample(
@@ -207,7 +216,7 @@ async def test_llm_judge_validation_uncaught_exception(
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    dataset = AlignmentDataset(task=None, samples=samples)
+    dataset = AlignmentDataset(task=mock_task, samples=samples)
     with pytest.raises(Exception):
         results = await llm_judge_validation(
             dataset, mock_model, mock_client_uncaught_exception, mock_semaphore

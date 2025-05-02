@@ -4,6 +4,8 @@ from aif_gen.dataset import (
     ContinualAlignmentDataset,
 )
 from aif_gen.dataset.validation import count_validation
+from aif_gen.task.alignment_task import AlignmentTask
+from aif_gen.task.domain import Domain
 
 
 def test_count_validation_all_unique():
@@ -18,7 +20,9 @@ def test_count_validation_all_unique():
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_counts = [
         {
@@ -44,7 +48,9 @@ def test_count_validation_all_same_prompts():
             'Mock prompt A 2', 'Winning Response C 2', 'Losing Response C 2'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_counts = [
         {
@@ -70,7 +76,9 @@ def test_count_validation_all_same_responses():
             'Mock prompt C 3', 'Winning Response A 3', 'Losing Response B 3'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_counts = [
         {
@@ -96,7 +104,9 @@ def test_count_validation_all_same_everything():
             'Mock prompt A 4', 'Winning Response A 4', 'Losing Response A 4'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_counts = [
         {
@@ -122,7 +132,9 @@ def test_count_countinual_dataset():
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset_one = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -136,7 +148,6 @@ def test_count_countinual_dataset():
             'Mock prompt A 2', 'Winning Response C 2', 'Losing Response C 2'
         ),
     ]
-    mock_task = None
     dataset_two = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -150,7 +161,6 @@ def test_count_countinual_dataset():
             'Mock prompt C 3', 'Winning Response A 3', 'Losing Response B 3'
         ),
     ]
-    mock_task = None
     dataset_three = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -164,7 +174,6 @@ def test_count_countinual_dataset():
             'Mock prompt A 4', 'Winning Response A 4', 'Losing Response A 4'
         ),
     ]
-    mock_task = None
     dataset_four = AlignmentDataset(task=mock_task, samples=samples)
 
     dataset = ContinualAlignmentDataset(
@@ -216,7 +225,9 @@ def test_count_validation_stop_words_removed():
             'with Mock prompt A 4', 'by Winning Response A 4', 'is Losing Response A 4'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_counts = [
         {
