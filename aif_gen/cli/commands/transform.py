@@ -4,7 +4,7 @@ from typing import Optional
 
 import click
 
-import aif_gen.dataset.transforms.functional as F
+import aif_gen.transforms.functional as F
 from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )

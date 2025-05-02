@@ -1,8 +1,8 @@
 import pytest
 
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
-from aif_gen.dataset.transforms import PreferenceSwapTransform
-from aif_gen.dataset.transforms import functional as F
+from aif_gen.transforms import PreferenceSwapTransform
+from aif_gen.transforms import functional as F
 
 from .conftest import mock_task
 
