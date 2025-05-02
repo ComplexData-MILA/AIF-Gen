@@ -11,7 +11,7 @@ class ResponseMapper(ResponseMapperBase):
     r"""Generate a prompt that, when given to a language model, produces a winning and losing response to the task_prompt.
 
     Args:
-        suffix_context (Optional[str]=None): Optionally add arbitrary context at the end of the generated prompt.
+        suffix_context (Optional[str]=None): Optional suffix text to add at the end of the generated prompt.
     """
 
     NUMBER_OF_PREFERENCE_AXES_SAMPLED: int = 3
@@ -38,15 +38,13 @@ class ResponseMapper(ResponseMapperBase):
 
     def generate_prompt(self, task: AlignmentTask, task_prompt: str) -> str:
         prompt = f"""\
-        Generate a 'chosen' and 'rejected' response pair to the following prompt: '{task_prompt}'.\n
-
+        Generate a 'chosen' and 'rejected' response pair to the following prompt: '{task_prompt}'.
         The 'chosen' response should respond to the prompt according to the following preference: '{task.preference}'.
         The 'rejected' response should still respond to the prompt according to the preference but negligibly worse in its quality, however still close to the chosen response so it confuses the reader which one is actually better. Consider exactly the same style and lengths for the chosen and rejected please.
         You don't need to start your prompt by saying 'User asks' or start by "chosen:" or "rejected:".
         """
         if self.suffix_context:
             prompt += self.suffix_context
-
         prompt = dedent(prompt)
         return prompt
 
@@ -73,7 +71,6 @@ class ResponseMapper(ResponseMapperBase):
         """
         if self.suffix_context:
             prompt += self.suffix_context
-
         prompt = dedent(prompt)
         return prompt
 
