@@ -3,7 +3,7 @@ from aif_gen.dataset import (
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation import entropy_validation
+from aif_gen.validation import entropy_validation
 
 
 def test_entropy_validation_all_unique():

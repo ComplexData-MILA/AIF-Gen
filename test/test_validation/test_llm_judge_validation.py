@@ -8,7 +8,7 @@ from aif_gen.dataset import (
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation.llm_judge import llm_judge_validation
+from aif_gen.validation.llm_judge import llm_judge_validation
 
 _EXP_KEYS = [
     'alignment_max',

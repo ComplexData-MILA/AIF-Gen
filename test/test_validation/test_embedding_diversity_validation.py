@@ -4,8 +4,8 @@ import pytest
 
 from aif_gen.dataset import AlignmentDataset, ContinualAlignmentDataset
 from aif_gen.dataset.alignment_sample import AlignmentDatasetSample
-from aif_gen.dataset.validation import llm_embedding_diversity
 from aif_gen.task import AlignmentTask, Domain, DomainComponent
+from aif_gen.validation import llm_embedding_diversity
 
 _BATCH_SIZE = 1
 _EXP_KEYS = [
