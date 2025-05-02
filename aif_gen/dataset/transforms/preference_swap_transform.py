@@ -49,9 +49,7 @@ class PreferenceSwapTransform(DatasetTransform):
         if self.swap_probability == 0:
             return dataset if in_place else copy.deepcopy(dataset)
 
-        if self._is_dataset_continual(dataset):
-            # This assert is here to make mypy happy
-            assert isinstance(dataset, ContinualAlignmentDataset)
+        if isinstance(dataset, ContinualAlignmentDataset):
             if in_place:
                 for i in range(dataset.num_datasets):
                     dataset.datasets[i] = self._apply(dataset.datasets[i], in_place)
@@ -79,10 +77,10 @@ class PreferenceSwapTransform(DatasetTransform):
     ) -> AlignmentDataset:
         for i in range(len(dataset)):
             if swap_outcomes[i]:
-                chosen = dataset.samples[i].chosen
-                rejected = dataset.samples[i].rejected
-                dataset.samples[i].chosen = rejected
-                dataset.samples[i].rejected = chosen
+                dataset.samples[i].chosen, dataset.samples[i].rejected = (
+                    dataset.samples[i].rejected,
+                    dataset.samples[i].chosen,
+                )
         return dataset
 
     def _apply_copy(
@@ -103,8 +101,6 @@ class PreferenceSwapTransform(DatasetTransform):
             train_frac=dataset.train_frac,
         )
 
-    def _validate_swap_probability(self, swap_probability: float) -> None:
-        if not 0 <= swap_probability <= 1:
-            raise ValueError(
-                f'Expected a swap probability in the range [0, 1] but got: {swap_probability}'
-            )
+    def _validate_swap_probability(self, swap_prob: float) -> None:
+        if not 0 <= swap_prob <= 1:
+            raise ValueError(f'Swap probability must be in [0, 1], got: {swap_prob}')
