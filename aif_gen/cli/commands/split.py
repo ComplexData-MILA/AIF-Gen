@@ -4,7 +4,7 @@ from typing import Optional
 
 import click
 
-import aif_gen.dataset.split.functional as F
+import aif_gen.dataset.transforms.functional as F
 from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )
@@ -73,15 +73,13 @@ def split(
 
     seed_everything(random_seed)
     logging.info(f'Splitting dataset with test_sample_ratio={test_sample_ratio}')
-    dataset = F.split(dataset, test_ratio=test_sample_ratio)
+    transformed_dataset = F.split_transform(dataset, test_ratio=test_sample_ratio)
     logging.info(f'Writing dataset to: {output_file}')
-    dataset.to_json(output_file)
-    logging.info(f'Wrote {dataset.num_samples} samples to: {output_file}')
+    transformed_dataset.to_json(output_file)
+    logging.info(f'Wrote {transformed_dataset.num_samples} samples to: {output_file}')
 
     if hf_repo_id_out is not None:
         upload_to_hf(hf_repo_id_out, output_file)
         logging.info(f'Uploaded dataset to HuggingFace repo: {hf_repo_id_out}')
     else:
         logging.info(f'No HuggingFace repo specified for upload.')
-
-    return
