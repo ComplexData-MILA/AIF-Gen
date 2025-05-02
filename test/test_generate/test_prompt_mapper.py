@@ -1,6 +1,7 @@
 import pytest
 
-from aif_gen.api.prompt_mapper import PromptMapper
+from aif_gen.generate.mappers import PromptMapper
+from aif_gen.generate.mappers.base import ETHICAL_GUIDELINES
 from aif_gen.task import AlignmentTask, Domain, DomainComponent
 
 
@@ -38,7 +39,7 @@ def test_generate_prompt_uniform_component_weights(
     prompt_mapper = PromptMapper(max_seed_word_samples, suffix_context=suffix_context)
     prompt = prompt_mapper.generate_prompt(task)
 
-    assert PromptMapper.ETHICAL_GUIDELINES in prompt
+    assert ETHICAL_GUIDELINES in prompt
     assert objective in prompt
     assert any(word in prompt for word in all_seed_words)
     if suffix_context is not None:
@@ -63,7 +64,7 @@ def test_generate_prompt_non_uniform_component_weights(
     prompt_mapper = PromptMapper(max_seed_word_samples, suffix_context=suffix_context)
     prompt = prompt_mapper.generate_prompt(task)
 
-    assert PromptMapper.ETHICAL_GUIDELINES in prompt
+    assert ETHICAL_GUIDELINES in prompt
     assert objective in prompt
     assert any(word in prompt for word in all_seed_words)
     if suffix_context is not None:
@@ -82,7 +83,7 @@ def test_generate_prompt_single_domain_component(max_seed_word_samples, suffix_c
     prompt_mapper = PromptMapper(max_seed_word_samples, suffix_context=suffix_context)
     prompt = prompt_mapper.generate_prompt(task)
 
-    assert PromptMapper.ETHICAL_GUIDELINES in prompt
+    assert ETHICAL_GUIDELINES in prompt
     assert objective in prompt
     assert any(word in prompt for word in all_seed_words)
     if suffix_context is not None:

@@ -12,14 +12,13 @@ import openai
 import pydantic
 from tqdm.asyncio import tqdm
 
-from aif_gen.api.prompt_mapper import PromptMapper
-from aif_gen.api.response_mapper import ResponseMapper
 from aif_gen.dataset import (
     AlignmentDataset,
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
 from aif_gen.generate.caching import AsyncElasticsearchCache
+from aif_gen.generate.mappers import PromptMapper, ResponseMapper
 from aif_gen.task.alignment_task import AlignmentTask
 
 

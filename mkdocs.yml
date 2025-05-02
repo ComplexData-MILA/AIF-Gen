@@ -14,7 +14,6 @@ nav:
       - API Reference:
           - dataset.md
           - task.md
-          - mappers.md
           - generation.md
           - transforms.md
           - validation.md
