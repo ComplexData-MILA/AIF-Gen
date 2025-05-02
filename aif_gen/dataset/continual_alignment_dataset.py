@@ -1,14 +1,17 @@
+from __future__ import annotations
+
 import json
 import pathlib
 from typing import Any, Dict, List, Union
 
 from datasets import Dataset
-
-from aif_gen.dataset.alignment_sample import AlignmentDatasetSample
+from pydantic.dataclasses import dataclass
 
 from .alignment_dataset import AlignmentDataset
+from .alignment_sample import AlignmentDatasetSample
 
 
+@dataclass(slots=True)
 class ContinualAlignmentDataset:
     r"""Container object for a Continual Alignment Dataset.
 
@@ -16,13 +19,7 @@ class ContinualAlignmentDataset:
         datasets (List[ContinualAlignmentDataset]): Temporal list of AlignmentDatasets constituents.
     """
 
-    def __init__(self, datasets: List[AlignmentDataset]) -> None:
-        self._datasets = datasets
-
-    @property
-    def datasets(self) -> List[AlignmentDataset]:
-        r"""List[AlignmentDataset]: The list of AlignmentDataset constituents."""
-        return self._datasets
+    datasets: List[AlignmentDataset]
 
     @property
     def num_datasets(self) -> int:
@@ -48,7 +45,7 @@ class ContinualAlignmentDataset:
         return all_samples[key]
 
     def append(self, dataset: AlignmentDataset) -> None:
-        r"""Append a single AlignmentDataset to the ConitnualAlignmentDataset.
+        r"""Append a single AlignmentDataset to the ContinualAlignmentDataset.
 
         Args:
             dataset (AlignmentDataset): The new dataset to add.
@@ -64,7 +61,7 @@ class ContinualAlignmentDataset:
             )
 
     def extend(self, datasets: List[AlignmentDataset]) -> None:
-        r"""Append multiple AlignmentDataset's to the ConitnualAlignmentDataset.
+        r"""Append multiple AlignmentDataset's to the ContinualAlignmentDataset.
 
         Args:
             datasets (List[AlignmentDataset]): The new datasets to add.
@@ -89,8 +86,6 @@ class ContinualAlignmentDataset:
 
     def to_dict(self) -> Dict[str, Any]:
         r"""Convert the ContinualAlignmentDataset to dictionary represenetation.
-
-        Note: This method is the functional inverse of ContinualAlignmentDataset.from_dict().
 
         Returns:
             Dict[str, Any]: The dictionary representation of the ContinualAlignmentDataset.
@@ -119,7 +114,7 @@ class ContinualAlignmentDataset:
         return cls.from_dict(dataset_dict)
 
     @classmethod
-    def from_dict(cls, dataset_dict: Dict[str, Any]) -> 'ContinualAlignmentDataset':
+    def from_dict(cls, dataset_dict: Dict[str, Any]) -> ContinualAlignmentDataset:
         r"""Construct a ContinualAlignmentDataset from dictionary representation.
 
         Note:
