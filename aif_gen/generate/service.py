@@ -512,7 +512,7 @@ async def _generate_sample_with_preference_axes(
         # generate a list of randomly generated scores each between 1 and 5
         scores = [
             random.randint(1, 5)
-            for _ in range(response_mapper.NUMBER_OF_PREFERENCE_AXES_SAMPLED)
+            for _ in range(response_mapper.NUM_PREFERENCE_AXES_SAMPLES)
         ]
         task_prompt = response_mapper.generate_no_preference_prompt(
             task,
