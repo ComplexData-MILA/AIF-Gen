@@ -59,6 +59,7 @@ class PromptMapper(PromptMapperBase):
 
     def _sample_seed_words(self, task: AlignmentTask) -> List[str]:
         domain = task.domain
+        assert domain.weights is not None
 
         total_weight = sum(domain.weights)
         component_weights = [weight / total_weight for weight in domain.weights]

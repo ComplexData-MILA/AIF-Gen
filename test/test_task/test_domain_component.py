@@ -13,7 +13,6 @@ def test_init():
     assert component.name == name
     assert component.seed_words == seed_words
     assert component.description == description
-    assert component.num_seed_words == len(seed_words)
 
 
 def test_init_no_description():
@@ -24,7 +23,6 @@ def test_init_no_description():
     assert component.name == name
     assert component.seed_words == seed_words
     assert component.description is None
-    assert component.num_seed_words == len(seed_words)
 
 
 def test_init_empty_seed_words():
@@ -37,16 +35,18 @@ def test_init_empty_seed_words():
 @pytest.mark.parametrize(
     'seed_word_alias', ['education', 'finance', 'healthcare', 'politics', 'technology']
 )
-def test_init_seed_word_alias(seed_word_alias):
-    name = 'TestComponent'
-    description = 'Mock Domain Component'
+def test_init_from_dict_seed_word_alias(seed_word_alias):
+    component_dict = {
+        'name': 'TestComponent',
+        'seed_words': seed_word_alias,
+        'description': 'Mock Domain Component',
+    }
 
-    component = DomainComponent(name, seed_word_alias, description)
+    component = DomainComponent.from_dict(component_dict)
     exp_seed_words = get_seed_words(seed_word_alias)
-    assert component.name == name
+    assert component.name == component_dict['name']
     assert component.seed_words == exp_seed_words
-    assert component.description == description
-    assert component.num_seed_words == len(exp_seed_words)
+    assert component.description == component_dict['description']
 
 
 def test_init_from_dict():
@@ -60,7 +60,6 @@ def test_init_from_dict():
     assert component.name == component_dict['name']
     assert component.seed_words == component_dict['seed_words']
     assert component.description == component_dict['description']
-    assert component.num_seed_words == len(component_dict['seed_words'])
 
 
 def test_init_from_dict_no_description():
@@ -73,7 +72,6 @@ def test_init_from_dict_no_description():
     assert component.name == component_dict['name']
     assert component.seed_words == component_dict['seed_words']
     assert component.description is None
-    assert component.num_seed_words == len(component_dict['seed_words'])
 
 
 def test_init_from_dict_missing_keys():

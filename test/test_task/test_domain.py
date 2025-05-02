@@ -135,16 +135,6 @@ def test_init_from_dict_no_weights():
     assert domain.weights == [1 / len(component_dict)] * len(component_dict)
 
 
-def test_init_from_dict_seed_word_alias():
-    component_dict = {'education': None}
-    domain = Domain.from_dict(component_dict)
-    assert domain.num_components == len(component_dict)
-    for component in domain.components:
-        assert component.name in component_dict
-        assert component.seed_words == get_seed_words(component.name)
-    assert domain.weights == [1 / len(component_dict)] * len(component_dict)
-
-
 def test_init_from_dict_multiple_seed_word_alias():
     component_dict = {'education': {'weight': 0.7}, 'technology': {'weight': 0.3}}
     domain = Domain.from_dict(component_dict)

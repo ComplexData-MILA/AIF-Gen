@@ -11,3 +11,5 @@
 ::: aif_gen.task.domain_component.DomainComponent
 
 ## Seed Words
+
+::: aif_gen.task.seed_words

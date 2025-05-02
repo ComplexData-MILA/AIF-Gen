@@ -25,11 +25,13 @@ def mock_task():
             'Component A': {
                 'name': 'Component A',
                 'seed_words': ['a_foo', 'a_bar', 'a_baz'],
+                'description': None,
                 'weight': 0.5,
             },
             'Component B': {
                 'name': 'Component B',
                 'seed_words': ['b_foo', 'b_bar'],
+                'description': None,
                 'weight': 0.5,
             },
         },
