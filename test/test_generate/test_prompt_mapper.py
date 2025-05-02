@@ -1,6 +1,6 @@
 import pytest
 
-from aif_gen.api.prompt_mapper import PromptMapper
+from aif_gen.generate.prompt_mapper import PromptMapper
 from aif_gen.task import AlignmentTask, Domain, DomainComponent
 
 

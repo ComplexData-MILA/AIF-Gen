@@ -31,10 +31,10 @@ class Domain:
         if not len(self.components):
             raise ValueError('Domain must have a non-empty list of DomainComponents')
         if self.weights is None:
-            self.weights = [1 / len(self.components)] * len(self.components)
-        if len(self.weights) != len(self.components):
+            self.weights = [1 / self.num_components] * self.num_components
+        if len(self.weights) != self.num_components:
             raise ValueError(
-                f'Mismatch: {len(self.components)} components != {len(self.weights)} weights'
+                f'Mismatch: {self.num_components} components, {len(self.weights)} weights'
             )
 
     @classmethod

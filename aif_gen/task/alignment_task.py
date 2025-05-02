@@ -7,7 +7,7 @@ from pydantic.dataclasses import dataclass
 from .domain import Domain
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AlignmentTask:
     r"""Encapsulates the specification of an alignment problem.
 

@@ -1,0 +1,2 @@
+from aif_gen.generate.response_mapper.base import ResponseMapperBase
+from aif_gen.generate.response_mapper.response_mapper import ResponseMapper
