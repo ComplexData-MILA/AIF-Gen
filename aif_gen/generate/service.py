@@ -18,8 +18,7 @@ from aif_gen.dataset import (
     ContinualAlignmentDataset,
 )
 from aif_gen.generate.caching import AsyncElasticsearchCache
-from aif_gen.generate.prompt_mapper import PromptMapper
-from aif_gen.generate.response_mapper import ResponseMapper
+from aif_gen.generate.mappers import PromptMapper, ResponseMapper
 from aif_gen.task.alignment_task import AlignmentTask
 
 

@@ -1,6 +1,6 @@
 import random
 
-from aif_gen.generate.response_mapper import ResponseMapper
+from aif_gen.generate.mappers import ResponseMapper
 from aif_gen.task import AlignmentTask, Domain, DomainComponent
 
 

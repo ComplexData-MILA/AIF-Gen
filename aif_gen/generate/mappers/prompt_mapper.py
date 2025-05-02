@@ -5,7 +5,7 @@ import numpy as np
 
 from aif_gen.task import AlignmentTask
 
-from .base import PromptMapperBase
+from .base import ETHICAL_GUIDELINES, PromptMapperBase
 
 
 class PromptMapper(PromptMapperBase):
@@ -39,7 +39,7 @@ class PromptMapper(PromptMapperBase):
         Do not include any meta commentary, instructions, or extra text (e.g., avoid phrases like "User asks" or additional context).
         The output should be clear and self-contained.
         You don't need to start by saying "prompt:".
-        {self.ETHICAL_GUIDELINES}
+        {ETHICAL_GUIDELINES}
         """
         if self.suffix_context:
             prompt += self.suffix_context
