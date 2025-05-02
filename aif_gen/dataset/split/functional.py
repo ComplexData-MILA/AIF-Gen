@@ -23,6 +23,6 @@ def split(
             )
     # just change the fractions
     for i in range(len(dataset.datasets)):
-        dataset.datasets[i]._train_frac = 1 - test_ratio
+        dataset.datasets[i].train_frac = 1 - test_ratio
 
     return dataset
