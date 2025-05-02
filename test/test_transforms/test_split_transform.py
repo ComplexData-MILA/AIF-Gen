@@ -111,8 +111,8 @@ def test_apply_split_transform_to_static_dataset(
         'test': [
             {
                 'prompt': 'Mock prompt B 1',
-                'chosen': 'Losing Response B 1',
-                'rejected': 'Winning Response B 1',
+                'chosen': 'Winning Response B 1',
+                'rejected': 'Losing Response B 1',
             },
             {
                 'prompt': 'Mock prompt C 1',
@@ -151,15 +151,15 @@ def test_apply_split_transform_to_continual_dataset(
                 'train': [
                     {
                         'prompt': 'Mock prompt A 1',
-                        'chosen': 'Losing Response A 1',
-                        'rejected': 'Winning Response A 1',
+                        'chosen': 'Winning Response A 1',
+                        'rejected': 'Losing Response A 1',
                     },
                 ],
                 'test': [
                     {
                         'prompt': 'Mock prompt B 1',
-                        'chosen': 'Losing Response B 1',
-                        'rejected': 'Winning Response B 1',
+                        'chosen': 'Winning Response B 1',
+                        'rejected': 'Losing Response B 1',
                     },
                     {
                         'prompt': 'Mock prompt C 1',
@@ -172,21 +172,21 @@ def test_apply_split_transform_to_continual_dataset(
                 'task': mock_task(),
                 'train': [
                     {
-                        'prompt': 'Mock prompt A 1',
-                        'chosen': 'Losing Response A 1',
-                        'rejected': 'Winning Response A 1',
+                        'prompt': 'Mock prompt A 2',
+                        'chosen': 'Winning Response A 2',
+                        'rejected': 'Losing Response A 2',
                     },
                 ],
                 'test': [
                     {
-                        'prompt': 'Mock prompt B 1',
-                        'chosen': 'Losing Response B 1',
-                        'rejected': 'Winning Response B 1',
+                        'prompt': 'Mock prompt B 2',
+                        'chosen': 'Winning Response B 2',
+                        'rejected': 'Losing Response B 2',
                     },
                     {
-                        'prompt': 'Mock prompt C 1',
-                        'chosen': 'Winning Response C 1',
-                        'rejected': 'Losing Response C 1',
+                        'prompt': 'Mock prompt C 2',
+                        'chosen': 'Winning Response C 2',
+                        'rejected': 'Losing Response C 2',
                     },
                 ],
             },
@@ -203,7 +203,7 @@ def test_apply_split_transform_to_continual_dataset(
         transformed_dataset = transform.apply(dataset, in_place)
     elif application_type == 'functional':
         transformed_dataset = F.split_transform(
-            dataset, test_ratio=1, in_place=in_place
+            dataset, test_ratio=0.5, in_place=in_place
         )
 
     assert transformed_dataset.to_dict() == expected_dataset_dict
