@@ -1,12 +1,12 @@
 ## Basic Statistics
 
-::: aif_gen.dataset.validation.counts
-::: aif_gen.dataset.validation.entropy
+::: aif_gen.validation.counts
+::: aif_gen.validation.entropy
 
 ## Diversity
 
-::: aif_gen.dataset.validation.embedding_diversity
+::: aif_gen.validation.embedding_diversity
 
 ## LLM Judge
 
-::: aif_gen.dataset.validation.llm_judge
+::: aif_gen.validation.llm_judge
