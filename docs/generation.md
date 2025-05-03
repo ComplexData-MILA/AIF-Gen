@@ -2,7 +2,7 @@
 
 ### LLM Inference Engine Service
 
-::: aif_gen.generate.service
+::: aif_gen.generate.engine
 
 #### Prompt Mapper
 
