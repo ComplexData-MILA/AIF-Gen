@@ -11,14 +11,14 @@ import openai
 from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation import (
+from aif_gen.util.hf import download_from_hf, upload_to_hf
+from aif_gen.util.seed import seed_everything
+from aif_gen.validation import (
     count_validation,
     entropy_validation,
     llm_embedding_diversity,
     llm_judge_validation,
 )
-from aif_gen.util.hf import download_from_hf, upload_to_hf
-from aif_gen.util.seed import seed_everything
 
 
 @click.command(context_settings={'show_default': True})

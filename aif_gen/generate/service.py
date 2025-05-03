@@ -184,7 +184,7 @@ async def generate_continual_dataset(
                     prompt = sample.prompt
                     chosen = sample.chosen
                     rejected = sample.rejected
-                    from aif_gen.dataset.validation.llm_judge import _get_score
+                    from aif_gen.validation.llm_judge import _get_score
 
                     alignment_coro = _get_score(
                         get_judge_model_prompt(

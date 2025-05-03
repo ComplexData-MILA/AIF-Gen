@@ -3,9 +3,9 @@ from aif_gen.dataset import (
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation import count_validation
 from aif_gen.task.alignment_task import AlignmentTask
 from aif_gen.task.domain import Domain
+from aif_gen.validation import count_validation
 
 
 def test_count_validation_all_unique():

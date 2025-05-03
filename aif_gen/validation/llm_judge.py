@@ -28,7 +28,7 @@ async def llm_judge_validation(
     max_tokens_judge_response: int = 32,
     dry_run: bool = False,
 ) -> Optional[List[Optional[Dict[str, float]]]]:
-    r"""Use an LLM to judge the quality of the dataset..
+    r"""Use an LLM to judge the quality of the dataset.
 
     Args:
         dataset (Union[ContinualAlignmentDataset, AlignmentDataset]): The dataset to validate.
@@ -72,9 +72,7 @@ async def llm_judge_validation(
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(
-                f'Exception occurred on dry-run, skipping validation: {e}'
-            )
+            logging.exception(f'Exception on dry-run, skipping validation: {e}')
             raise e
         finally:
             if cache is not None:
@@ -96,47 +94,33 @@ async def llm_judge_validation(
         logging.info(f'Validating Dataset ({dataset_size} samples)')
 
         for sample in dataset.samples:
-            alignment_coro = _get_score(
-                _get_alignment_prompt(sample.prompt, sample.chosen, sample.rejected),
-                client,
-                model_name,
-                async_semaphore,
-                max_tokens_judge_response,
-                dataset_idx=dataset_idx,
-                metric_name='alignment',
-                cache=cache,
-            )
-            coherence_chosen_coro = _get_score(
-                _get_coherence_prompt(sample.chosen),
-                client,
-                model_name,
-                async_semaphore,
-                max_tokens_judge_response,
-                dataset_idx=dataset_idx,
-                metric_name='coherence_chosen',
-                cache=cache,
-            )
-            coherence_rejected_coro = _get_score(
-                _get_coherence_prompt(sample.rejected),
-                client,
-                model_name,
-                async_semaphore,
-                max_tokens_judge_response,
-                dataset_idx=dataset_idx,
-                metric_name='coherence_rejected',
-                cache=cache,
-            )
-            futures.append(asyncio.create_task(alignment_coro))
-            futures.append(asyncio.create_task(coherence_chosen_coro))
-            futures.append(asyncio.create_task(coherence_rejected_coro))
-
+            prompts = {
+                'alignment': _get_alignment_prompt(
+                    sample.prompt, sample.chosen, sample.rejected
+                ),
+                'coherence_chosen': _get_coherence_prompt(sample.chosen),
+                'coherence_rejected': _get_coherence_prompt(sample.rejected),
+            }
+            for metric_name, prompt in prompts.items():
+                coro = _get_score(
+                    prompt,
+                    client,
+                    model_name,
+                    async_semaphore,
+                    max_tokens_judge_response,
+                    dataset_idx=dataset_idx,
+                    metric_name=metric_name,
+                    cache=cache,
+                )
+                futures.append(asyncio.create_task(coro))
     try:
-        results: List[Dict[str, List[float]]] = [defaultdict(list)] * len(datasets)
+        results: List[Dict[str, List]] = [
+            defaultdict(list) for _ in range(len(datasets))
+        ]
         for fut in tqdm.as_completed(futures, total=len(futures)):
             result = await fut
             if result is None:
                 continue
-
             score, dataset_idx, metric_name = result
             if score is not None:
                 results[dataset_idx][metric_name].append(score)
@@ -154,9 +138,8 @@ async def llm_judge_validation(
                         f'Dataset {i} {metric_name} validation coverage: {len(metric_values)} / {len(dataset)}'
                     )
                 if len(metric_values) == 0:
-                    raise RuntimeError(
-                        f'Could not parse LLM output for any samples in dataset {i}'
-                    )
+                    raise RuntimeError(f'No samples could be parsed in dataset {i}')
+
             aggregated_results.append(_compute_statistics(results[i]))
         return aggregated_results
 
@@ -164,7 +147,7 @@ async def llm_judge_validation(
         logging.exception(f'Exception occurred while generating dataset: {e}')
         for fut in futures:
             fut.cancel()
-        await tqdm.gather(*futures, return_exceptions=True)
+        await tqdm.gather(*futures)
         return None
 
     finally:
