@@ -1,5 +1,7 @@
 # AIF-GEN Documentation
 
+![image](./img/logo.svg)
+
 ## Installing from source:
 
 ### Prerequisites
