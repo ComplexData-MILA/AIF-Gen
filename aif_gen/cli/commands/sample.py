@@ -6,6 +6,7 @@ from typing import Optional
 import click
 from tqdm import tqdm
 
+from aif_gen.dataset.alignment_dataset import AlignmentDataset
 from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )
@@ -96,35 +97,30 @@ def sample(
     logging.info(f'Starting sampling with seed {random_seed} for each task.')
     seed_everything(random_seed)
 
-    for task in tqdm(dataset.datasets, desc='Processing datasets'):
-        train_size = (
-            keep_amount_train
-            if keep_amount_train is not None
-            else int(keep_ratio_train * len(task.train))
-        )
-        test_size = (
-            keep_amount_test
-            if keep_amount_test is not None
-            else int(keep_ratio_test * len(task.test))
-        )
+    for i, data in tqdm(enumerate(dataset.datasets), desc='Processing datasets'):
+        train, test = data.train, data.test
 
-        train_size = min(train_size, len(task.train))
-        test_size = min(test_size, len(task.test))
+        train_size = int(keep_ratio_train * len(train))
+        if keep_amount_train is not None:
+            train_size = keep_amount_train
 
-        new_train = random.sample(task.train, train_size)
-        new_test = random.sample(task.test, test_size)
-        # concatenate the new train and test samples into one list
-        task._samples = new_train + new_test
+        test_size = int(keep_ratio_test * len(test))
+        if keep_amount_test is not None:
+            test_size = keep_amount_test
+
+        train_size = min(train_size, len(train))
+        test_size = min(test_size, len(test))
+
+        new_train = random.sample(train, train_size)
+        new_test = random.sample(test, test_size)
+        dataset.datasets[i] = AlignmentDataset(
+            task=data.task, samples=new_train + new_test, train_frac=data.train_frac
+        )
 
     logging.info(f'Writing dataset to: {output_file}')
     dataset.to_json(output_file)
     logging.info(f'Wrote {dataset.num_samples} samples to: {output_file}')
 
-    # Save the sampled dataset
     if hf_repo_id_out is not None:
         upload_to_hf(hf_repo_id_out, output_file)
         logging.info(f'Uploaded dataset to HuggingFace repo: {hf_repo_id_out}')
-    else:
-        logging.info(f'No HuggingFace repo specified for upload.')
-
-    return
