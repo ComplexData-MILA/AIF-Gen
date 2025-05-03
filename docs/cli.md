@@ -18,10 +18,6 @@ Under construction
 
 ::: aif_gen.cli.commands.sample
 
-## Split
-
-::: aif_gen.cli.commands.split
-
 ## Transform
 
 ::: aif_gen.cli.commands.transform
