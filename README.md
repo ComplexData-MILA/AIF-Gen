@@ -1,7 +1,7 @@
 <a id="readme-top"></a>
 
 <div align="center">
-  <h1 style="font-size:3vw;padding:0;margin:0;display:inline">AIF-Gen</h3>
+  <img height="150" src="./docs/img/logo.svg" />
   <h3 style="margin:0">A tool for generating synthetic, continual RLHF preference datasets</h3>
   <a href="https://aif_gen.readthedocs.io/en/latest"/><strong>Read the docs»</strong></a>
   <a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read the paper»</strong></a>
