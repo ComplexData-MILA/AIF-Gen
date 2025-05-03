@@ -1,6 +1,6 @@
 import random
 from textwrap import dedent
-from typing import Optional
+from typing import Optional, Tuple
 
 from aif_gen.task import AlignmentTask
 
@@ -15,8 +15,8 @@ class ResponseMapper(ResponseMapperBase):
     """
 
     NUM_PREFERENCE_AXES_SAMPLES: int = 3
-    TASK_PREFERENCE_INCLUSION_PROB_POS: float = 0.5
-    TASK_PREFERENCE_INCLUSION_PROB_NEG: float = 0.5
+    PREFERENCE_INCLUSION_PROB_POS: float = 0.5
+    PREFERENCE_INCLUSION_PROB_NEG: float = 0.5
 
     def __init__(self, suffix_context: Optional[str] = None) -> None:
         self._suffix_context = suffix_context
@@ -47,28 +47,33 @@ class ResponseMapper(ResponseMapperBase):
         """
         if self.suffix_context:
             prompt += self.suffix_context
-        prompt = dedent(prompt)
-        return prompt
+        return dedent(prompt)
 
     def generate_no_preference_prompt(
-        self, task: AlignmentTask, task_prompt: str, scores: list[int], parity: int = 0
-    ) -> str:
-        desc_pos, desc_neg = '', ''
-        if random.random() < self.TASK_PREFERENCE_INCLUSION_PROB_POS and parity == 0:
-            desc_pos = f'Your response must follow this preference overall: PREFERENCE: {task.preference}\n'
-        elif random.random() < self.TASK_PREFERENCE_INCLUSION_PROB_NEG and parity == 1:
-            desc_neg = f'Your response must not respect this preference overall: PREFERENCE: {task.preference}\n'
+        self, task: AlignmentTask, task_prompt: str
+    ) -> Tuple[str, str]:
+        scores = [random.randint(1, 5) for _ in range(self.NUM_PREFERENCE_AXES_SAMPLES)]
 
-        prompt = f"""\
-        Generate a response to the following prompt: '{task_prompt}'.
-        {desc_pos}{desc_neg} and
-        {self._preference_axes_scale(scores)}'
-        You don't need to start your response by saying "here is the response" nor to give any meta-explanation. Just provide the response.
-        """
-        if self.suffix_context:
-            prompt += self.suffix_context
-        prompt = dedent(prompt)
-        return prompt
+        def _generate_no_preference_prompt(parity: int) -> str:
+            desc_pos, desc_neg = '', ''
+            if random.random() < self.PREFERENCE_INCLUSION_PROB_POS and parity == 0:
+                desc_pos = f'Your response must follow this preference overall: PREFERENCE: {task.preference}\n'
+            elif random.random() < self.PREFERENCE_INCLUSION_PROB_NEG and parity == 1:
+                desc_neg = f'Your response must not respect this preference overall: PREFERENCE: {task.preference}\n'
+
+            prompt = f"""\
+            Generate a response to the following prompt: '{task_prompt}'.
+            {desc_pos}{desc_neg} and
+            {self._preference_axes_scale(scores)}'
+            You don't need to start your response by saying "here is the response" nor to give any meta-explanation. Just provide the response.
+            """
+            if self.suffix_context:
+                prompt += self.suffix_context
+            return dedent(prompt)
+
+        prompt1 = _generate_no_preference_prompt(parity=0)
+        prompt2 = _generate_no_preference_prompt(parity=1)
+        return prompt1, prompt2
 
     @property
     def preference_axes(self) -> list[tuple[str, str]]:

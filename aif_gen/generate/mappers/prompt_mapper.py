@@ -40,8 +40,7 @@ class PromptMapper(PromptMapperBase):
         """
         if self.suffix_context:
             prompt += self.suffix_context
-        prompt = dedent(prompt)
-        return prompt
+        return dedent(prompt)
 
     @property
     def max_seed_word_samples(self) -> int:

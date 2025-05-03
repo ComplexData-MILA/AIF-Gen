@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import os
-import random
 from collections import defaultdict
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
@@ -20,20 +19,6 @@ from aif_gen.dataset import (
 from aif_gen.generate.caching import AsyncElasticsearchCache
 from aif_gen.generate.mappers import PromptMapper, ResponseMapper
 from aif_gen.task.alignment_task import AlignmentTask
-
-
-def get_judge_model_prompt(
-    prompt: str, chosen: str, rejected: str, preference: str
-) -> str:
-    return (
-        'Please evaluate whether "response 1" is more aligned with the "prompt", compared to "response 2" according to the following preference.'
-        f'Preference: {preference}\n'
-        'Respond with "1" if "response 1" is more aligned, and "0" if "response 2" is more aligned.'
-        f'Prompt: {prompt}\n\n'
-        f'Response 1: {chosen}\n\n'
-        f'Response 2: {rejected}\n\n'
-        'Alignment (1 or 0):'
-    )
 
 
 async def generate_continual_dataset(
@@ -65,15 +50,11 @@ async def generate_continual_dataset(
     """
     prompt_mapper = PromptMapper()
     response_mapper = ResponseMapper()
-
     task_specs = data_config['task_specs']
 
     if dry_run:
         logging.info(f'Doing dry-run data generation on a single sample...')
         mock_task = AlignmentTask.from_dict(task_specs[0]['alignment_task'])
-        cache = await AsyncElasticsearchCache.maybe_from_env_var(
-            index_name=f'CACHE_DATA_GENERATION_{model_name}'
-        )
         coro = _generate_sample(
             mock_task,
             client,
@@ -85,20 +66,15 @@ async def generate_continual_dataset(
             max_tokens_chosen_rejected_response,
             dataset_idx=-1,
             prompt_idx=-1,
-            cache=cache,
+            cache=None,
+            include_preference_axes=include_preference_axes,
             temperature=temperature,
         )
         try:
             _ = await coro
         except BaseException as e:
-            logging.exception(
-                f'Exception occurred on dry-run, skipping generation: {e}'
-            )
+            logging.exception(f'Exception on dry-run, skipping generation: {e}')
             raise e
-        finally:
-            if cache is not None:
-                await cache.close()
-
         logging.info('Dry run was a success.')
         return None
 
@@ -114,36 +90,21 @@ async def generate_continual_dataset(
         tasks.append(task)
         dataset_sizes.append(dataset_size)
         for _sample_idx in range(dataset_size):
-            if include_preference_axes:
-                coro = _generate_sample_with_preference_axes(
-                    task,
-                    client,
-                    model_name,
-                    prompt_mapper,
-                    response_mapper,
-                    async_semaphore,
-                    max_tokens_prompt_response,
-                    max_tokens_chosen_rejected_response,
-                    dataset_idx=dataset_idx,
-                    prompt_idx=_sample_idx,
-                    cache=cache,
-                    temperature=temperature,
-                )
-            else:
-                coro = _generate_sample(
-                    task,
-                    client,
-                    model_name,
-                    prompt_mapper,
-                    response_mapper,
-                    async_semaphore,
-                    max_tokens_prompt_response,
-                    max_tokens_chosen_rejected_response,
-                    dataset_idx=dataset_idx,
-                    prompt_idx=_sample_idx,
-                    cache=cache,
-                    temperature=temperature,
-                )
+            coro = _generate_sample(
+                task,
+                client,
+                model_name,
+                prompt_mapper,
+                response_mapper,
+                async_semaphore,
+                max_tokens_prompt_response,
+                max_tokens_chosen_rejected_response,
+                dataset_idx=dataset_idx,
+                prompt_idx=_sample_idx,
+                cache=cache,
+                include_preference_axes=include_preference_axes,
+                temperature=temperature,
+            )
             futures.append(asyncio.create_task(coro))
 
     try:
@@ -164,9 +125,23 @@ async def generate_continual_dataset(
                 )
             continual_dataset.append(AlignmentDataset(tasks[i], samples[i]))
 
-        # need to use the judge model if the preference axes are included
-        # will be used to ensure chosen and reject are consistent with the task preference
+        # If preference axes included, use judge to pick chosen/rejected responses
         if include_preference_axes:
+            from aif_gen.validation.llm_judge import _get_score
+
+            def _get_judge_prompt(
+                prompt: str, chosen: str, rejected: str, preference: str
+            ) -> str:
+                return (
+                    'Please evaluate whether "response 1" is more aligned with the "prompt", compared to "response 2" according to the following preference.'
+                    f'Preference: {preference}\n'
+                    'Respond with "1" if "response 1" is more aligned, and "0" if "response 2" is more aligned.'
+                    f'Prompt: {prompt}\n'
+                    f'Response 1: {chosen}\n'
+                    f'Response 2: {rejected}\n'
+                    'Alignment (1 or 0):'
+                )
+
             cache_judge = await AsyncElasticsearchCache.maybe_from_env_var(
                 index_name=f'CACHE_DATA_GENERATION_JUDGE_{model_name}'
             )
@@ -176,31 +151,22 @@ async def generate_continual_dataset(
             datasets = continual_dataset.datasets
             for dataset_idx, dataset in enumerate(datasets):
                 dataset_size = len(dataset)
-                logging.info(
-                    f'Judging preference on Dataset ({dataset_size} samples) {dataset.task}'
-                )
-                dataset_preference = dataset.task.preference
+                logging.info(f'Judging dataset ({dataset_size} samples) {dataset.task}')
+                preference = dataset.task.preference
                 for sample in dataset.samples:
-                    prompt = sample.prompt
-                    chosen = sample.chosen
-                    rejected = sample.rejected
-                    from aif_gen.validation.llm_judge import _get_score
-
-                    alignment_coro = _get_score(
-                        get_judge_model_prompt(
-                            prompt, chosen, rejected, dataset_preference
+                    judge_coro = _get_score(
+                        _get_judge_prompt(
+                            sample.prompt, sample.chosen, sample.rejected, preference
                         ),
                         client,
                         model_name,
                         async_semaphore,
-                        64,
+                        max_tokens_judge_response=64,
                         dataset_idx=dataset_idx,
                         metric_name='alignment_generation',
                         cache=cache_judge,
                     )
-
-                    futures.append(asyncio.create_task(alignment_coro))  # type: ignore
-
+                    futures.append(asyncio.create_task(judge_coro))  # type: ignore
             try:
                 results: List[Dict[str, List[float]]] = [
                     defaultdict(list) for _ in range(len(datasets))
@@ -211,15 +177,12 @@ async def generate_continual_dataset(
                         continue
 
                     score, dataset_idx, metric_name = result
-
                     if score is not None:
                         results[dataset_idx][metric_name].append(score)
 
                 for dataset_idx, dataset in enumerate(datasets):
                     if not len(dataset):
-                        logging.warning(
-                            f'Dataset {dataset_idx} is empty, skipping judging preference.'
-                        )
+                        logging.warning(f'Dataset {dataset_idx} empty, skipping judge.')
                         continue
 
                     dataset_scores = results[dataset_idx]
@@ -232,23 +195,21 @@ async def generate_continual_dataset(
                                 f'No judge score for sample {sample_idx} in dataset {dataset_idx}, skipping.'
                             )
                             continue
-                        sample_score = scores[sample_idx]
-                        if sample_score not in (0.0, 1.0):
+                        score = scores[sample_idx]
+                        if score not in (0.0, 1.0):
                             logging.warning(
-                                f'Bad judge score {sample_score!r} for sample {sample_idx}, skipping.'
+                                f'Bad judge score {score!r} for sample {sample_idx}, skipping.'
                             )
                             continue
-                        if sample_score == 0.0:
+                        if score == 0.0:  # swap if judge says response 2 is better
                             sample.chosen, sample.rejected = (
                                 sample.rejected,
                                 sample.chosen,
                             )
-                            # swap if judge says response 2 is better
-
                 logging.info('Judging preference completed.')
 
             except BaseException as e:
-                logging.exception(f'Exception occurred while judging preference: {e}')
+                logging.exception(f'Exception while judging preference: {e}')
                 for fut in futures:
                     fut.cancel()
                 await asyncio.gather(*futures, return_exceptions=True)
@@ -258,8 +219,8 @@ async def generate_continual_dataset(
                     await cache_judge.close()
                 if cache is not None:
                     await cache.close()
-
         return continual_dataset
+
     except BaseException as e:
         logging.exception(f'Exception occurred while generating dataset: {e}')
         for fut in futures:
@@ -282,6 +243,19 @@ def _get_tries(default: int = 3) -> int:
     return default
 
 
+class _PromptProposal(pydantic.BaseModel, extra='forbid'):
+    prompt: str
+
+
+class _Response(pydantic.BaseModel, extra='forbid'):
+    response: str
+
+
+class _ResponsePair(pydantic.BaseModel, extra='forbid'):
+    chosen: str
+    rejected: str
+
+
 @backoff.on_exception(
     backoff.expo,
     (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
@@ -298,18 +272,11 @@ async def _generate_sample(
     max_tokens_chosen_rejected_response: int,
     dataset_idx: int,
     prompt_idx: int,
+    include_preference_axes: bool,
     cache: 'AsyncElasticsearchCache | None' = None,
     temperature: float = 1.0,
 ) -> Optional[Tuple[AlignmentDatasetSample, int]]:
     try:
-
-        class _PromptProposal(pydantic.BaseModel, extra='forbid'):
-            prompt: str
-
-        class _ResponsePair(pydantic.BaseModel, extra='forbid'):
-            chosen: str
-            rejected: str
-
         meta_prompt = prompt_mapper.generate_prompt(task)
         meta_prompt_nonce = f'{prompt_idx}'
 
@@ -317,9 +284,6 @@ async def _generate_sample(
             if cache is not None:
                 output = await cache.get(meta_prompt, nonce=meta_prompt_nonce)
             else:
-                output = None
-
-            if output is None:
                 response = await client.chat.completions.create(
                     model=model_name,
                     messages=[{'role': 'user', 'content': meta_prompt}],
@@ -335,173 +299,67 @@ async def _generate_sample(
                     temperature=temperature,
                 )
                 output = response.choices[0].message.content
-                assert output is not None  # This is for mypy
 
         if output is None:
             raise ValueError(f'Received None response to prompt: {meta_prompt}')
-
         prompt = _PromptProposal.model_validate_json(output).prompt
-
-        # Update/set cache only after validating output JSON.
         if cache is not None:
             await cache.set(query=meta_prompt, value=output, nonce=meta_prompt_nonce)
-
-        task_prompt = response_mapper.generate_prompt(task, prompt)
         logging.debug(
-            f'Meta Prompt: {meta_prompt} (Nonce: {meta_prompt_nonce}), '
-            f'Model Response: {prompt}'
+            f'Meta Prompt: {meta_prompt} (Nonce: {meta_prompt_nonce}), Model Response: {prompt}'
         )
 
-        async with async_semaphore:
-            if cache is not None:
-                output = await cache.get(task_prompt)
-            else:
-                output = None
+        if include_preference_axes:
+            task_prompt1, task_prompt2 = response_mapper.generate_no_preference_prompt(
+                task, prompt
+            )
+            task_prompt = task_prompt1 + task_prompt2
 
-            if output is None:
-                response = await client.chat.completions.create(
-                    model=model_name,
-                    messages=[{'role': 'user', 'content': task_prompt}],
-                    max_tokens=max_tokens_chosen_rejected_response,
-                    response_format={
-                        'type': 'json_schema',
-                        'json_schema': {
-                            'name': 'SyntheticPreference',
-                            'schema': _ResponsePair.model_json_schema(),
-                            'strict': True,
-                        },
-                    },
-                    temperature=temperature,
-                )
-                output = response.choices[0].message.content
-                assert output is not None  # This is for mypy
+            async with async_semaphore:
+                if cache is not None:
+                    output = await cache.get(task_prompt1 + task_prompt2)
+                else:
+                    futures = []
+                    for response_prompt in [task_prompt1, task_prompt2]:
+                        coro = client.chat.completions.create(
+                            model=model_name,
+                            messages=[{'role': 'user', 'content': response_prompt}],
+                            max_tokens=max_tokens_chosen_rejected_response,
+                            response_format={
+                                'type': 'json_schema',
+                                'json_schema': {
+                                    'name': 'SyntheticPreference',
+                                    'schema': _Response.model_json_schema(),
+                                    'strict': True,
+                                },
+                            },
+                            temperature=temperature,
+                        )
+                        futures.append(asyncio.create_task(coro))
 
-        if prompt is None:
-            raise ValueError(f'Received None response to prompt: {prompt}')
-
-        structured_response = _ResponsePair.model_validate_json(output)
-        if cache is not None:
-            await cache.set(query=task_prompt, value=output)
-
-        sample = AlignmentDatasetSample(
-            prompt,
-            chosen=structured_response.chosen,
-            rejected=structured_response.rejected,
-        )
-        logging.debug(f'Task Prompt: {task_prompt}, Sample: {sample}')
-        return sample, dataset_idx
-    except pydantic.ValidationError as e:
-        logging.error(f'Failed to bind structured output json schema: {e}')
-        return None
-
-
-@backoff.on_exception(
-    backoff.expo,
-    (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
-    max_tries=_get_tries(),
-)
-async def _generate_sample_with_preference_axes(
-    task: AlignmentTask,
-    client: openai.AsyncOpenAI,
-    model_name: str,
-    prompt_mapper: PromptMapper,
-    response_mapper: ResponseMapper,
-    async_semaphore: asyncio.Semaphore,
-    max_tokens_prompt_response: int,
-    max_tokens_chosen_rejected_response: int,
-    dataset_idx: int,
-    prompt_idx: int,
-    cache: 'AsyncElasticsearchCache | None' = None,
-    temperature: float = 1.0,
-) -> Optional[Tuple[AlignmentDatasetSample, int]]:
-    try:
-
-        class _PromptProposal(pydantic.BaseModel, extra='forbid'):
-            prompt: str
-
-        class _Response(pydantic.BaseModel, extra='forbid'):
-            response: str
-
-        class ResponsePair(pydantic.BaseModel, extra='forbid'):
-            chosen: str  # no more the semantics of chosen - just for naming
-            rejected: str  # no more the semantics of rejected - just for naming
-
-        meta_prompt = prompt_mapper.generate_prompt(task)
-        meta_prompt_nonce = f'{prompt_idx}'
-
-        async with async_semaphore:
-            if cache is not None:
-                output: Optional[str] = await cache.get(
-                    meta_prompt, nonce=meta_prompt_nonce
-                )
-            else:
-                output = None
-
-            if output is None:
-                response = await client.chat.completions.create(
-                    model=model_name,
-                    messages=[{'role': 'user', 'content': meta_prompt}],
-                    max_tokens=max_tokens_prompt_response,
-                    response_format={
-                        'type': 'json_schema',
-                        'json_schema': {
-                            'name': 'PromptProposal',
-                            'schema': _PromptProposal.model_json_schema(),
-                            'strict': True,
-                        },
-                    },
-                    temperature=temperature,
-                )
-                output = response.choices[0].message.content
-                assert output is not None  # This is for mypy
-
-        if output is None:
-            raise ValueError(f'Received None response to prompt: {meta_prompt}')
-
-        prompt = _PromptProposal.model_validate_json(output).prompt
-
-        # Update/set cache only after validating output JSON.
-        if cache is not None:
-            await cache.set(query=meta_prompt, value=output, nonce=meta_prompt_nonce)
-
-        # generate a list of randomly generated scores each between 1 and 5
-        scores = [
-            random.randint(1, 5)
-            for _ in range(response_mapper.NUM_PREFERENCE_AXES_SAMPLES)
-        ]
-        task_prompt = response_mapper.generate_no_preference_prompt(
-            task,
-            prompt,
-            scores,
-            parity=0,
-        )
-        task_prompt_second = response_mapper.generate_no_preference_prompt(
-            task,
-            prompt,
-            scores,
-            parity=1,
-        )
-        logging.debug(
-            f'Meta Prompt: {meta_prompt} (Nonce: {meta_prompt_nonce}), '
-            f'Model Response: {prompt}'
-        )
-
-        async with async_semaphore:
-            if cache is not None:
-                output = await cache.get(task_prompt + task_prompt_second)
-                if output is None:
-                    raise ValueError(
-                        f'No cached response for task prompt: {task_prompt + task_prompt_second}'
+                    resp1 = await futures[0]
+                    resp2 = await futures[1]
+                    output1_str = resp1.choices[0].message.content
+                    output2_str = resp2.choices[0].message.content
+                    struct_resp = _Response.model_validate_json(output1_str)  # type: ignore
+                    struct_resp2 = _Response.model_validate_json(output2_str)  # type: ignore
+                    if struct_resp.response is None or struct_resp2.response is None:
+                        raise ValueError(
+                            f'Received None response to prompt: {prompt}, Output1: {output1_str}, Output2: {output2_str}'
+                        )
+                    output = json.dumps(
+                        {
+                            'chosen': struct_resp.response,
+                            'rejected': struct_resp2.response,
+                        }
                     )
-                structured_output = ResponsePair.model_validate_json(output)
-                output1_str: str = structured_output.chosen
-                output2_str: str = structured_output.rejected
-            else:
-                output = None
-
-            if output is None:
-                task1 = asyncio.create_task(
-                    client.chat.completions.create(
+        else:
+            task_prompt = response_mapper.generate_prompt(task, prompt)
+            async with async_semaphore:
+                if cache is not None:
+                    output = await cache.get(task_prompt)
+                else:
+                    response = await client.chat.completions.create(
                         model=model_name,
                         messages=[{'role': 'user', 'content': task_prompt}],
                         max_tokens=max_tokens_chosen_rejected_response,
@@ -509,63 +367,19 @@ async def _generate_sample_with_preference_axes(
                             'type': 'json_schema',
                             'json_schema': {
                                 'name': 'SyntheticPreference',
-                                'schema': _Response.model_json_schema(),
+                                'schema': _ResponsePair.model_json_schema(),
                                 'strict': True,
                             },
                         },
                         temperature=temperature,
                     )
-                )
-                task2 = asyncio.create_task(
-                    client.chat.completions.create(
-                        model=model_name,
-                        messages=[{'role': 'user', 'content': task_prompt_second}],
-                        max_tokens=max_tokens_chosen_rejected_response,
-                        response_format={
-                            'type': 'json_schema',
-                            'json_schema': {
-                                'name': 'SyntheticPreference',
-                                'schema': _Response.model_json_schema(),
-                                'strict': True,
-                            },
-                        },
-                        temperature=temperature,
-                    )
-                )
-                resp1 = await task1
-                resp2 = await task2
-                [resp1, resp2]
-                output1 = resp1.choices[0].message.content
-                output2 = resp2.choices[0].message.content
-                # guard against None, then narrow the types
-                if output1 is None or output2 is None:
-                    raise ValueError(
-                        f'Expected two JSON strings, got: {output1!r}, {output2!r}'
-                    )
-                output1_str = output1
-                output2_str = output2
+                    output = response.choices[0].message.content
 
-        if prompt is None:
+        if output is None:
             raise ValueError(f'Received None response to prompt: {prompt}')
-
-        structured_response1 = _Response.model_validate_json(output1_str)
-        structured_response2 = _Response.model_validate_json(output2_str)
-        if (
-            structured_response1.response is None
-            or structured_response2.response is None
-        ):
-            raise ValueError(
-                f'Received None response to prompt: {prompt}, '
-                f'Output1: {output1_str}, Output2: {output2_str}'
-            )
-        combined_response: dict[str, str] = {
-            'chosen': structured_response1.response,
-            'rejected': structured_response2.response,
-        }
-        output = json.dumps(combined_response)
-        structured_response = ResponsePair.model_validate_json(output)
+        structured_response = _ResponsePair.model_validate_json(output)
         if cache is not None:
-            await cache.set(query=(task_prompt + task_prompt_second), value=output)
+            await cache.set(query=task_prompt, value=output)
 
         sample = AlignmentDatasetSample(
             prompt,
