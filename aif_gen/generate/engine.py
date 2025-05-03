@@ -37,7 +37,7 @@ def get_judge_model_prompt(
 
 
 async def generate_continual_dataset(
-    data_config: Dict[str, Any],  # TODO: Should bind this type
+    data_config: Dict[str, Any],
     model_name: str,
     client: openai.AsyncOpenAI,
     async_semaphore: asyncio.Semaphore,
@@ -266,13 +266,14 @@ async def generate_continual_dataset(
             fut.cancel()
         await tqdm.gather(*futures)
         return None
+
     finally:
         if cache is not None:
             await cache.close()
 
 
 @lru_cache(maxsize=None)
-def get_tries(default: int = 3) -> int:
+def _get_tries(default: int = 3) -> int:
     if 'BACKOFF_RETRIES' in os.environ:
         try:
             return int(os.environ['BACKOFF_RETRIES'])
@@ -284,7 +285,7 @@ def get_tries(default: int = 3) -> int:
 @backoff.on_exception(
     backoff.expo,
     (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
-    max_tries=get_tries(),
+    max_tries=_get_tries(),
 )
 async def _generate_sample(
     task: AlignmentTask,
@@ -300,29 +301,6 @@ async def _generate_sample(
     cache: 'AsyncElasticsearchCache | None' = None,
     temperature: float = 1.0,
 ) -> Optional[Tuple[AlignmentDatasetSample, int]]:
-    r"""Generate a AlignmentDataset dataset given the AlignmentTask, and model.
-
-    Args:
-        task (AlignmentTask): The AlignmentTask to generate data for.
-        client (openai.AsyncOpenAI): Handle to openAI client.
-        model_name (str): openAI model alias.
-        prompt_mapper (PromptMapper): Creates the 'meta-prompt' for this sample's task prompt.
-        response_mapper (ResponseMapper): Created the 'meta-prompt' for this sample's response prompt.
-        async_semaphore (asyncio.Semaphore): Semaphore that manages number of concurrent API requests.
-        max_tokens_prompt_response (int): Configurable limit on the max_tokens for the generated prompt response.
-        max_tokens_chosen_rejected_response (int): Configurable limit on the max_tokens for the generated chosen and rejected response.
-        dataset_idx (int): The idx of the dataset that the sample is requested for to align out-of-order asyn execution.
-        max_tokens (int): Max number of tokens to generate.
-        prompt_idx (int): The idx of the sample, to distinguish between multiple requests for the same task.
-        cache (AsyncElasticsearchCache): Optionally specify a AsyncElasticsearchCache instance for caching.
-        temperature (float): Temperature for the model.
-
-    Returns:
-        Optional[Tuple[AlignmentDatasetSample, int]]: A single sample of the dataset, and the dataset idx (None if pydantic.ValidationError occurred).
-
-    Raises:
-        openai.NotFoundError: If the openAI model cannot be accessed at the configured endpoint.
-    """
     try:
 
         class _PromptProposal(pydantic.BaseModel, extra='forbid'):
@@ -420,7 +398,7 @@ async def _generate_sample(
 @backoff.on_exception(
     backoff.expo,
     (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
-    max_tries=get_tries(),
+    max_tries=_get_tries(),
 )
 async def _generate_sample_with_preference_axes(
     task: AlignmentTask,
@@ -436,29 +414,6 @@ async def _generate_sample_with_preference_axes(
     cache: 'AsyncElasticsearchCache | None' = None,
     temperature: float = 1.0,
 ) -> Optional[Tuple[AlignmentDatasetSample, int]]:
-    r"""Generate a AlignmentDataset dataset given the AlignmentTask, and model including the preference axes during response mapping.
-
-    Args:
-        task (AlignmentTask): The AlignmentTask to generate data for.
-        client (openai.AsyncOpenAI): Handle to openAI client.
-        model_name (str): openAI model alias.
-        prompt_mapper (PromptMapper): Creates the 'meta-prompt' for this sample's task prompt.
-        response_mapper (ResponseMapper): Created the 'meta-prompt' for this sample's response prompt.
-        async_semaphore (asyncio.Semaphore): Semaphore that manages number of concurrent API requests.
-        max_tokens_prompt_response (int): Configurable limit on the max_tokens for the generated prompt response.
-        max_tokens_chosen_rejected_response (int): Configurable limit on the max_tokens for the generated chosen and rejected response.
-        dataset_idx (int): The idx of the dataset that the sample is requested for to align out-of-order asyn execution.
-        max_tokens (int): Max number of tokens to generate.
-        prompt_idx (int): The idx of the sample, to distinguish between multiple requests for the same task.
-        cache (AsyncElasticsearchCache): Optionally specify a AsyncElasticsearchCache instance for caching.
-        temperature (float): Temperature for the model.
-
-    Returns:
-        Optional[Tuple[AlignmentDatasetSample, int]]: A single sample of the dataset, and the dataset idx (None if pydantic.ValidationError occurred).
-
-    Raises:
-        openai.NotFoundError: If the openAI model cannot be accessed at the configured endpoint.
-    """
     try:
 
         class _PromptProposal(pydantic.BaseModel, extra='forbid'):
