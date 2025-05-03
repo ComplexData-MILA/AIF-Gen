@@ -55,8 +55,8 @@ async def llm_judge_validation(
     if dry_run:
         logging.info(f'Doing dry-run data validation on a single sample...')
         mock_sample = AlignmentDatasetSample('Mock', 'Mock', 'Mock')
-        _prompt = _get_alignment_prompt(
-            mock_sample.prompt, mock_sample.chosen, mock_sample.rejected
+        _prompt = _get_judge_prompt(
+            mock_sample.prompt, mock_sample.chosen, mock_sample.rejected, 'foo'
         )
         coro = _get_score(
             _prompt,
@@ -91,11 +91,11 @@ async def llm_judge_validation(
     for dataset_idx, dataset in enumerate(datasets):
         dataset_size = len(dataset)
         logging.info(f'Validating Dataset ({dataset_size} samples)')
-
+        preference = dataset.task.preference
         for sample in dataset.samples:
             prompts = {
-                'alignment': _get_alignment_prompt(
-                    sample.prompt, sample.chosen, sample.rejected
+                'alignment': _get_judge_prompt(
+                    sample.prompt, sample.chosen, sample.rejected, preference
                 ),
                 'coherence_chosen': _get_coherence_prompt(sample.chosen),
                 'coherence_rejected': _get_coherence_prompt(sample.rejected),
@@ -210,15 +210,15 @@ async def _get_score(
         return None, dataset_idx, metric_name
 
 
-def _get_alignment_prompt(prompt: str, chosen: str, rejected: str) -> str:
+def _get_judge_prompt(prompt: str, chosen: str, rejected: str, preference: str) -> str:
     return (
-        'Please evaluate whether "response 1" is more aligned with the "prompt", compared to "response 2". '
-        'Consider alignment with the prompt in terms of clarity, relevance, and correctness regarding preferences specified in the prompt. '
+        'Please evaluate whether "response 1" is more aligned with the "prompt", compared to "response 2" according to the following preference.'
+        f'Preference: {preference}\n'
         'Respond with "1" if "response 1" is more aligned, and "0" if "response 2" is more aligned.'
-        f'Prompt: {prompt}\n\n'
-        f'Response 1: {chosen}\n\n'
-        f'Response 2: {rejected}\n\n'
-        'Alignment (0 or 1):'
+        f'Prompt: {prompt}\n'
+        f'Response 1: {chosen}\n'
+        f'Response 2: {rejected}\n'
+        'Alignment (1 or 0):'
     )
 
 

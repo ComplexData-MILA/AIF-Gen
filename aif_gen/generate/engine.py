@@ -127,20 +127,10 @@ async def generate_continual_dataset(
 
         # If preference axes included, use judge to pick chosen/rejected responses
         if include_preference_axes:
-            from aif_gen.validation.llm_judge import _get_score
-
-            def _get_judge_prompt(
-                prompt: str, chosen: str, rejected: str, preference: str
-            ) -> str:
-                return (
-                    'Please evaluate whether "response 1" is more aligned with the "prompt", compared to "response 2" according to the following preference.'
-                    f'Preference: {preference}\n'
-                    'Respond with "1" if "response 1" is more aligned, and "0" if "response 2" is more aligned.'
-                    f'Prompt: {prompt}\n'
-                    f'Response 1: {chosen}\n'
-                    f'Response 2: {rejected}\n'
-                    'Alignment (1 or 0):'
-                )
+            from aif_gen.validation.llm_judge import (
+                _get_judge_prompt,
+                _get_score,
+            )
 
             cache_judge = await AsyncElasticsearchCache.maybe_from_env_var(
                 index_name=f'CACHE_DATA_GENERATION_JUDGE_{model_name}'
