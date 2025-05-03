@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -7,24 +9,18 @@ from elasticsearch import AsyncElasticsearch
 
 
 class AsyncElasticsearchCache:
-    def __init__(self, es: AsyncElasticsearch, index_name: str):
-        """Ensure the Elasticsearch index exists before querying or inserting data."""
+    def __init__(self, es: AsyncElasticsearch, index_name: str) -> None:
         self.es = es
         self.index_name = index_name
-        self.is_refresh_required = bool(os.environ.get('FORCE_CACHE_REFRESH'))
         logging.info(f'Elastic Index Name: {self.index_name}')
 
+        self.is_refresh_required = bool(os.environ.get('FORCE_CACHE_REFRESH'))
         if self.is_refresh_required:
             logging.warning('FORCE_CACHE_REFRESH is enabled. All queries will miss.')
 
     @staticmethod
-    async def maybe_from_env_var(index_name: str) -> 'AsyncElasticsearchCache | None':
-        """Initialize from env var.
-
-        Return None if any of the required env var is missing.
-        """
-        index_name = index_name.lower()
-
+    async def maybe_from_env_var(index_name: str) -> AsyncElasticsearchCache | None:
+        """Initialize from env var. Returns None if any of the required env vars are missing."""
         required_env_keys = ['ELASTIC_SEARCH_HOST', 'ELASTIC_SEARCH_API_KEY']
         if not all((_key in os.environ) for _key in required_env_keys):
             logging.warning(
@@ -40,25 +36,13 @@ class AsyncElasticsearchCache:
             request_timeout=None,
         )
 
-        # Ensure the index exists at startup
-        # parse the name if / is present
-        index_name = index_name.replace('/', '_')
-        exists = await es.indices.exists(index=index_name)
-        if not exists:
+        # Ensure the index exists at startup (parse the name if '/' is present)
+        index_name = index_name.lower().replace('/', '_')
+        if not await es.indices.exists(index=index_name):
             await es.indices.create(index=index_name)
-
         return AsyncElasticsearchCache(es=es, index_name=index_name)
 
-    @staticmethod
-    def _get_query_hash(query: str, nonce: Optional[str] = None) -> str:
-        """Obtain query hash given query and- optionally- nonce."""
-        query_key = query
-        if nonce is not None:
-            query_key += f'\n{nonce}'
-
-        return hashlib.sha256(query_key.encode()).hexdigest()
-
-    async def get(self, query: str, nonce: Optional[str] = None) -> 'str | None':
+    async def get(self, query: str, nonce: Optional[str] = None) -> str | None:
         """Try reading response from cache.
 
         Args:
@@ -98,3 +82,10 @@ class AsyncElasticsearchCache:
     async def close(self) -> None:
         """Close Elasticsearch connection."""
         await self.es.close()
+
+    @staticmethod
+    def _get_query_hash(query: str, nonce: Optional[str] = None) -> str:
+        query_key = query
+        if nonce is not None:
+            query_key += f'\n{nonce}'
+        return hashlib.sha256(query_key.encode()).hexdigest()

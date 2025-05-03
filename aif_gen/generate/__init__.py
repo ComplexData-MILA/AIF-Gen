@@ -1,1 +1,1 @@
-from aif_gen.generate.service import generate_continual_dataset
+from aif_gen.generate.engine import generate_continual_dataset
