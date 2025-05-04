@@ -1,7 +1,7 @@
 <a id="readme-top"></a>
 
 ![image](./docs/img/prompt_mapper.svg#gh-dark-mode-only)
-![image](./docs/img/response_mapper.svg.svg#gh-light-mode-only)
+![image](./docs/img/response_mapper.svg#gh-light-mode-only)
 
 <div align="center">
   <h3>Generating Synthetic Continual RLHF Data at Scale</h3>
