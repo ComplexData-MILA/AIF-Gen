@@ -25,6 +25,12 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 
 ### Library Highlights
 
+- :zap: Asynchronous LLM batch inference powered by [vLLM](https://github.com/vllm-project/vllm)
+- :wrench: Modular prompt templates and fully customizable preference specification
+- :file_cabinet: LLM response cache to avoid redundant API requests
+- :white_check_mark: Validation metrics to judge synthetic data quality
+- :hugging_face: Direct integration with HuggingFace for efficient dataset management
+
 ### Architecture Overview
 
 ![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
