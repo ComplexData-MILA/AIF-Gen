@@ -3,9 +3,10 @@
 ![image](./docs/img/logo.svg)
 
 <div align="center">
-  <h3>Generating Synthetic Continual RLHF Data at Scale</h3>
-  <a href="https://aif-gen.readthedocs.io/en/latest"/><strong>Read Our Docs»</strong></a>
-  <a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read Our Paper»</strong></a>
+<h2>Generating Synthetic Continual RLHF Data at Scale</h2>
+<a href="https://aif-gen.readthedocs.io/en/latest"/><h3 strong>Read Our Docs»</strong></a>
+<a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read Our Paper»</strong></a>
+<br/>
 <br/>
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/ComplexData-MILA/AIF-Gen)](https://github.com/ComplexData-MILA/AIF-Gen/stargazers)
