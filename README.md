@@ -4,31 +4,19 @@
 
 <div align="center">
   <h3>Generating Synthetic Continual RLHF Data at Scale</h3>
-  <a href="https://aif-gen.readthedocs.io/en/latest"/><strong>Read the docs»</strong></a>
-  <a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read the paper»</strong></a>
-</div>
-
+  <a href="https://aif-gen.readthedocs.io/en/latest"/><strong>Read Our Docs»</strong></a>
+  <a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read Our Paper»</strong></a>
 <br/>
 
-<div align="center">
-
-<a href="">[![Contributors][contributors-shield]][contributors-url]</a>
-<a href="">[![Issues][issues-shield]][issues-url]</a>
-<a href="">[![MIT License][license-shield]][license-url]</a>
-
-</div>
-
-<div align="center">
-
-<a href="">![example workflow](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/ruff.yml/badge.svg)</a>
-<a href="">![example workflow](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/mypy.yml/badge.svg)</a>
-<a href="">![example workflow](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/testing.yml/badge.svg)</a>
+[![GitHub Repo stars](https://img.shields.io/github/stars/ComplexData-MILA/AIF-Gen)](https://github.com/ComplexData-MILA/AIF-Gen/stargazers)
+[![Unit Tests](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/testing.yml/badge.svg)](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/testing.yml)
+[![Linting](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/ruff.yml/badge.svg)](https://github.com/ComplexData-MILA/AIF-Gen/actions/workflows/ruff.yml)
 
 </div>
 
 ## About The Project
 
-_AIF-Gen_ is a Python library that generates (continual) RLHF preference datasets
+AIF-Gen is a Python library that generates (continual) RLHF preference datasets
 
 ![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
 ![image](./docs/img/architecture-light.svg#gh-light-mode-only)
@@ -102,9 +90,17 @@ uv run aif transform
 
 ## Installation
 
-## License
+The current recommended way to install AIF-Gen is from source:
 
-Distributed under the MIT License. See `LICENSE.txt` for more information.
+```sh
+git clone https://github.com/ComplexData-MILA/AIF-Gen.git
+cd AIF-Gen
+python3 -m pip install -e .
+```
+
+## Documentation
+
+Documentation along with a quick start guide can be found on the [docs website](https://aif-gen.readthedocs.io/).
 
 ## Citation
 
@@ -120,13 +116,6 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 ## Contributing
 
-To learn more about making a contribution to _OpenDG_ see our [contribution page](./.github/CONTRIBUTING.md).
+To learn more about making a contribution to AIF-Gen see our [contribution page](./.github/CONTRIBUTING.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-[contributors-shield]: https://img.shields.io/github/contributors/ComplexData-MILA/AIF-Gen.svg?style=for-the-badge
-[contributors-url]: https://github.com/ComplexData-MILA/AIF-Gen/graphs/contributors
-[issues-shield]: https://img.shields.io/github/issues/ComplexData-MILA/AIF-Gen.svg?style=for-the-badge
-[issues-url]: https://github.com/ComplexData-MILA/AIF-Gen/issues
-[license-shield]: https://img.shields.io/github/license/ComplexData-MILA/AIF-Gen.svg?style=for-the-badge
-[license-url]: https://github.com/ComplexData-MILA/AIF-Gen/blob/master/LICENSE.txt
