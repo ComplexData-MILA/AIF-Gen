@@ -91,12 +91,32 @@ uv run aif transform
 
 ## Installation
 
-The current recommended way to install AIF-Gen is from source:
+The current recommended way to install AIF-Gen is from source.
+
+### With [uv](https://docs.astral.sh/uv/) (recommended)
 
 ```sh
-git clone https://github.com/ComplexData-MILA/AIF-Gen.git
-cd AIF-Gen
-python3 -m pip install -e .
+# Create and activate your venv
+uv venv my_venv --python 3.10 && source my_venv/bin/activate
+
+# Install the wheels into the venv
+uv pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
+
+# Test the install
+aif
+```
+
+### Without uv
+
+```sh
+# Create and activate your venv
+python3.10 -m venv my_venv && source my_venv/bin/activate
+
+# Install the wheels into the venv
+pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
+
+# Test the install
+aif
 ```
 
 ## Documentation
