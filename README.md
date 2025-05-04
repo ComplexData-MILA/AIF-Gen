@@ -36,6 +36,9 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 ![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
 ![image](./docs/img/architecture-light.svg#gh-light-mode-only)
 
+> \[!NOTE\]
+> AIF-Gen is still alpha software, and may introduce breaking changes.
+
 ## Quick Tour for New Users
 
 AIF-Gen is intended to be primarily used as a command line tool. For advanced usage, refer to [our docs](https://aif-gen.readthedocs.io/).
@@ -107,7 +110,10 @@ uv run aif transform
 
 The current recommended way to install AIF-Gen is from source.
 
-#### With [uv](https://docs.astral.sh/uv/) (recommended)
+> \[!NOTE\]
+> AIF-Gen requires `python>=3.10`
+
+#### Using [uv](https://docs.astral.sh/uv/) (recommended)
 
 ```sh
 # Create and activate your venv
@@ -120,7 +126,7 @@ uv pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
 aif
 ```
 
-#### With [pip](https://pip.pypa.io/en/stable/installation/)
+#### Using [pip](https://pip.pypa.io/en/stable/installation/)
 
 ```sh
 # Create and activate your venv
