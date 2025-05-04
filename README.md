@@ -3,9 +3,9 @@
 ![image](./docs/img/logo.svg)
 
 <div align="center">
-<h2>Generating Synthetic Continual RLHF Data at Scale</h2>
-<a href="https://aif-gen.readthedocs.io/en/latest"/><h3 strong>Read Our Docs»</strong></a>
-<a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read Our Paper»</strong></a>
+<h3 style="font-size: 22px">Generating Synthetic Continual RLHF Data at Scale</h3>
+<a href="https://aif-gen.readthedocs.io/en/latest"/><strong style="font-size: 18px;">Read Our Docs»</strong></a>
+<a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong style="font-size: 18px;">Read Our Paper»</strong></a>
 <br/>
 <br/>
 
