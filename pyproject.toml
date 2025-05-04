@@ -7,7 +7,7 @@ aif = "aif_gen.cli.main:cli"
 
 [project]
 name = "aif-gen"
-version = "0.1.0"
+version = "0.0.1-alpha"
 description = "A tool for generating synthetic, continual RLHF preference datasets"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -29,7 +29,7 @@ wheels = [
 
 [[package]]
 name = "aif-gen"
-version = "0.1.0"
+version = "0.0.1a0"
 source = { editable = "." }
 dependencies = [
     { name = "backoff" },
