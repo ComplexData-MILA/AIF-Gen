@@ -37,8 +37,6 @@ _AIF-Gen_ is a Python library that generates (continual) RLHF preference dataset
 
 ## Quick Tour for New Users
 
-![image](./docs/img/architecture.svg)
-
 We expose the following cli:
 
 ```sh
