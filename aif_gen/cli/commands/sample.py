@@ -75,7 +75,7 @@ def sample(
     output_file: pathlib.Path,
     random_seed: int,
 ) -> None:
-    r"""Sample a ContinualAlignmentDataset into smaller train and test datasets.
+    r"""Downsample a ContinualAlignmentDataset.
 
     INPUT_DATA_FILE: Path to the input dataset.
     KEEP_RATIO_TRAIN: Ratio of samples to keep in the train dataset.

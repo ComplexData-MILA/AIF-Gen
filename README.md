@@ -23,6 +23,9 @@ It's main goal is to facilitate preference data generation at scale via [RL from
 
 You can find sample datasets and model artifacts generated with AIF-Gen on [our HuggingFace page](https://huggingface.co/datasets/ComplexDataLab/aif-gen).
 
+> \[!NOTE\]
+> AIF-Gen is still alpha software, and may introduce breaking changes.
+
 ### Library Highlights
 
 - :zap: Asynchronous LLM batch inference powered by [vLLM](https://github.com/vllm-project/vllm)
@@ -36,17 +39,34 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 ![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
 ![image](./docs/img/architecture-light.svg#gh-light-mode-only)
 
-> \[!NOTE\]
-> AIF-Gen is still alpha software, and may introduce breaking changes.
-
 ## Quick Tour for New Users
 
 AIF-Gen is intended to be primarily used as a command line tool. For advanced usage, refer to [our docs](https://aif-gen.readthedocs.io/).
 
 We expose the following cli:
 
-```sh
-aif --help
+```console
+foo@bar:~$ aif --help
+
+          / _ | /  _/ __/ / ___/ __/ |/ /
+         / __ |_/ // _/  / (_ / _//    /
+        /_/ |_/___/_/    \___/___/_/|_/
+
+A tool for generating synthetic continual RLHF datasets.
+
+Usage: aif [OPTIONS] COMMAND [ARGS]...
+
+Options:
+  --log_file FILE  Optional log file to use.  [default: aif_gen.log]
+  --help           Show this message and exit.
+
+Commands:
+  generate   Generate a new ContinualAlignmentDataset.
+  merge      Merge a set of ContinualAlignmentDatasets.
+  preview    Preview a ContinualAlignmentDataset.
+  sample     Downsample a ContinualAlignmentDataset.
+  transform  Transform a ContinualAlignmentDataset.
+  validate   Validate a ContinualAlignmentDataset.
 ```
 
 ### Generating Data
@@ -94,17 +114,8 @@ uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf --dry-run
 uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf
 ```
 
-### Validating Data
-
-```sh
-uv run aif validate
-```
-
-### Transform Data
-
-```sh
-uv run aif transform
-```
+> \[!TIP\]
+> Refer to our [our docs](https://aif-gen.readthedocs.io/) for information and example usage for the other commands.
 
 ## Installation
 
