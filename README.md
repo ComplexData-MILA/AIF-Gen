@@ -116,7 +116,7 @@ task_specs:
   - num_samples: 5
     alignment_task:
       objective: 'Ask an interesting philosophy question'
-      preference: 'Explain the answer to the question at a level that could be understood by a 5 year old'
+      preference: 'Explain the answer at a level that could be understood by a 5 year old'
       domain:
         philosophy:
           seed_words: # Some interesting words we want inject into our prompts
@@ -127,8 +127,8 @@ task_specs:
   # Second dataset, 5 samples of Philosophy QNA with expert preference
   - num_samples: 5
     alignment_task:
-      objective: 'Generate a news article headline'
-      preference: 'Make the headline short and unbiased'
+      objective: 'Ask an interesting philosophy question'
+      preference: 'Explain the answer at a level that could be understood by a 5 year old'
       domain:
         philosophy:
           seed_words: # Change up some seed words for variety
