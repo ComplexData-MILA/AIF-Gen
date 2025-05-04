@@ -1,7 +1,6 @@
 <a id="readme-top"></a>
 
-![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
-![image](./docs/img/architecture-light.svg#gh-light-mode-only)
+![image](./docs/img/logo.svg)
 
 <div align="center">
   <h3>Generating Synthetic Continual RLHF Data at Scale</h3>
@@ -30,6 +29,9 @@
 ## About The Project
 
 _AIF-Gen_ is a Python library that generates (continual) RLHF preference datasets
+
+![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
+![image](./docs/img/architecture-light.svg#gh-light-mode-only)
 
 ### Library Highlights
 
