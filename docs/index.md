@@ -24,3 +24,7 @@ uv sync
 ```
 
 For more details, see the [contribution guide](../.github/CONTRIBUTING.md).
+
+## Design
+
+![image](./img/architecture-dark.svg)
