@@ -27,4 +27,4 @@ For more details, see the [contribution guide](../.github/CONTRIBUTING.md).
 
 ## Design
 
-![image](./img/architecture-dark.svg)
+![image](./img/architecture-gray.svg)
