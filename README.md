@@ -94,7 +94,7 @@ Some things to keep in mind:
 
 #### Export env variables
 
-Now that the inference server is up, we'll need to export a few environment variables so that AIF-Gen knows where to direct requets.
+Now that the inference server is up, we'll need to export a few environment variables so that AIF-Gen knows where to direct requests.
 
 ```sh
 export OPENAI_BASE_URL=http://localhost:8000
@@ -122,8 +122,7 @@ task_specs:
           seed_words: # Some interesting words we want inject into our prompts
             - consciousness
             - time
-            - universe
-          description:
+            - metaphysics
 
   # Second dataset, 5 samples of Philosophy QNA with expert preference
   - num_samples: 5
@@ -132,31 +131,27 @@ task_specs:
       preference: 'Make the headline short and unbiased'
       domain:
         philosophy:
-          seed_words: # Some interesting words we want inject into our prompts
-            - consciousness
-            - time
+          seed_words: # Change up some seed words for variety
+            - determinism
             - universe
-          description:
+            - meaning
 ```
 
 This will produce a final dataset with 10 samples in [TRL preference format with explicit prompts](https://huggingface.co/docs/trl/en/dataset_formats).
-The first 5 responses follow the *ELI5* preference, while the last 5 should be more technical. Both use the same domain (philosophy) and use the same seed words but this can be customized.
+The first 5 responses follow the *ELI5* preference, while the last 5 should be more technical.
 
 #### Generate some data
 
-We can now generate data. It's advisable to do a dry run first to ensure everything is setup correctly:
+It's advisable to do a dry run first to ensure everything is setup correctly:
 
 ```sh
 aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf --dry-run
 ```
 
-If everything worked, you should see: `Dry run was a success`. You can now generate the full dataset:
+If everything worked, you should see: `Dry run was a success`. We can now generate the data:
 
 ```sh
 aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf
-
-# To ignore cache hit and force cache update, set FORCE_CACHE_REFRESH=True
-FORCE_CACHE_REFRESH=True aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf
 ```
 
 For options such as choosing output directory, changing model temperature, increasing concurrency limits, and uploading directly to hugging face, check our docs or issue `aif generate --help`.
