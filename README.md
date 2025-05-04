@@ -19,7 +19,7 @@
 
 AIF-Gen is a platform for generating synthetic RLHF datasets for lifelong reinforcement learning on LLMs.
 
-It's main goal is to facilitate preference data generation at scale via [RL from AI feedback](https://arxiv.org/abs/2309.00267). AIF-Gen natively supports evolving preferences making it especially useful for studying non-stationary domains such as tutoring. Think of it like [Procgen](https://github.com/openai/procgen), but for RLHF.
+Our main goal is to facilitate preference data generation at scale via [RL from AI feedback](https://arxiv.org/abs/2309.00267). AIF-Gen natively supports evolving preferences making it especially useful for studying non-stationary domains such as tutoring. Think of it like [Procgen](https://github.com/openai/procgen), but for RLHF.
 
 > \[!NOTE\]
 > AIF-Gen is still alpha software, and may introduce breaking changes.
