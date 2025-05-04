@@ -29,7 +29,7 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 - :wrench: Modular prompt templates and fully customizable preference specification
 - :file_cabinet: LLM response cache to avoid redundant API requests
 - :white_check_mark: Validation metrics to judge synthetic data quality
-- :hugging_face: Direct integration with HuggingFace for efficient dataset management
+- 🤗 Direct integration with HuggingFace for robust dataset management
 
 ### Architecture Overview
 
@@ -38,12 +38,12 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 
 ## Quick Tour for New Users
 
-AIF-Gen is primarily designed
+AIF-Gen is intended to be primarily used as a command line tool. For advanced usage, refer to [our docs](https://aif-gen.readthedocs.io/).
 
 We expose the following cli:
 
 ```sh
-uv run aif
+aif --help
 ```
 
 ### Generating Data

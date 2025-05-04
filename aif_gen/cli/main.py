@@ -18,7 +18,7 @@ class RichGroup(click.Group):
          / __ |_/ // _/  / (_ / _//    /
         /_/ |_/___/_/    \___/___/_/|_/"""
 
-        s += '\n\nA tool for synthetically generating continual RLHF datasets.\n\n'
+        s += '\n\nA tool for generating synthetic continual RLHF datasets.\n\n'
 
         formatter.write(s)
         super().format_help(ctx, formatter)
