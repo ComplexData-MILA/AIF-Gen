@@ -1,7 +1,9 @@
 <a id="readme-top"></a>
 
+![image](./docs/img/prompt_mapper.svg#gh-dark-mode-only)
+![image](./docs/img/response_mapper.svg.svg#gh-light-mode-only)
+
 <div align="center">
-  <img src="./docs/img/logo.svg" style="display: block; margin-bottom: 0; "/>
   <h3>Generating Synthetic Continual RLHF Data at Scale</h3>
   <a href="https://aif-gen.readthedocs.io/en/latest"/><strong>Read the docs»</strong></a>
   <a href="https://github.com/ComplexData-MILA/AIF-Gen"/><strong>Read the paper»</strong></a>
