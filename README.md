@@ -41,9 +41,7 @@ You can find sample datasets and model artifacts generated with AIF-Gen on [our 
 
 ## Quick Tour for New Users
 
-AIF-Gen is intended to be primarily used as a command line tool. For advanced usage, refer to [our docs](https://aif-gen.readthedocs.io/).
-
-We expose the following cli:
+AIF-Gen is intended to be primarily used as a command line tool:
 
 ```console
 foo@bar:~$ aif --help
@@ -69,50 +67,101 @@ Commands:
   validate   Validate a ContinualAlignmentDataset.
 ```
 
+For advanced usage, refer to [our docs](https://aif-gen.readthedocs.io/).
+
 ### Generating Data
 
-- In this example, we run inference using [allenai/OLMo-1B-hf](https://huggingface.co/allenai/OLMo-1B-hf)
-- The chat template we are using is found [here](https://github.com/ComplexData-MILA/AIF-Gen/blob/data/minimal_example/olmo-chat-template.jinja)
-- We use the api-key `MY_KEY`, but anything works here
-- This starts an inference server listening on `localhost:8000`
+In this example, we highlight the ease of generating synthetic data with AIF-Gen.
 
-#### Install VLLM (only needs to be done once)
+#### Pre-requisites
+
+First, ensure you have installed AIF-Gen (see [installation](#installation)).
+For this example, we'll generating data using [allenai/OLMo-1B-hf](https://huggingface.co/allenai/OLMo-1B-hf).
+The chat template we are using is found [here](./chat_templates/olmo-chat-template.jinja).
+
+We'll need to serve our model on an inference server with vLLM. The following will do the trick:
 
 ```sh
+# Install vLLM (only needs to be done once)
 uv tool install vllm
-```
 
-#### Serve a model locally using VLLM
-
-```sh
+# Serve the model locally
 uvx --with setuptools serve allenai/OLMo-1B-hf --dtype auto --api-key MY_KEY --chat-template chat_templates/omlo-chat-template.jinja
 ```
 
+Some things to keep in mind:
+
+- We use the api-key `MY_KEY`, but anything works here
+- This starts an inference server listening on `localhost:8000`
+
 #### Export env variables
+
+Now that the inference server is up, we'll need to export a few environment variables so that AIF-Gen knows where to direct requets.
 
 ```sh
 export OPENAI_BASE_URL=http://localhost:8000
 export OPENAI_API_KEY=MY_KEY
 
 # Optionally, set the following to cache OpenAI requests in Elasticsearch.
-# export ELASTIC_SEARCH_HOST="..."
-# export ELASTIC_SEARCH_API_KEY="..."
+export ELASTIC_SEARCH_HOST="..."
+export ELASTIC_SEARCH_API_KEY="..."
 ```
 
-#### Generate some data (dry-run)
+#### Create a Dataset Configuration
+
+We are now ready to specify our preference data configuration. We'll create the following yaml file in `config/philosophy_qna.yaml`.
+
+```yaml
+---
+task_specs:
+  # First dataset: 5 samples of Philosophy QNA with ELI5 preference
+  - num_samples: 5
+    alignment_task:
+      objective: 'Ask an interesting philosophy question'
+      preference: 'Explain the answer to the question at a level that could be understood by a 5 year old'
+      domain:
+        philosophy:
+          seed_words: # Some interesting words we want inject into our prompts
+            - consciousness
+            - time
+            - universe
+          description:
+
+  # Second dataset, 5 samples of Philosophy QNA with expert preference
+  - num_samples: 5
+    alignment_task:
+      objective: 'Generate a news article headline'
+      preference: 'Make the headline short and unbiased'
+      domain:
+        philosophy:
+          seed_words: # Some interesting words we want inject into our prompts
+            - consciousness
+            - time
+            - universe
+          description:
+```
+
+This will produce a final dataset with 10 samples in [TRL preference format with explicit prompts](https://huggingface.co/docs/trl/en/dataset_formats).
+The first 5 responses follow the *ELI5* preference, while the last 5 should be more technical. Both use the same domain (philosophy) and use the same seed words but this can be customized.
+
+#### Generate some data
+
+We can now generate data. It's advisable to do a dry run first to ensure everything is setup correctly:
 
 ```sh
-uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf --dry-run
-
-# To ignore cache hit and update cache, set FORCE_CACHE_REFRESH=True .
-# FORCE_CACHE_REFRESH=True uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf --dry-run
+aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf --dry-run
 ```
 
-#### Generate some data (for real)
+If everything worked, you should see: `Dry run was a success`. You can now generate the full dataset:
 
 ```sh
-uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf
+aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf
+
+# To ignore cache hit and force cache update, set FORCE_CACHE_REFRESH=True
+FORCE_CACHE_REFRESH=True aif generate config/philosophy_qna.yaml allenai/OLMo-1B-hf
 ```
+
+For options such as choosing output directory, changing model temperature, increasing concurrency limits, and uploading directly to hugging face, check our docs or issue `aif generate --help`.
 
 > \[!TIP\]
 > Refer to our [our docs](https://aif-gen.readthedocs.io/) for information and example usage for the other commands.
@@ -120,9 +169,6 @@ uv run aif generate config/aif_config.yaml allenai/OLMo-1B-hf
 ## Installation
 
 The current recommended way to install AIF-Gen is from source.
-
-> \[!NOTE\]
-> AIF-Gen requires `python>=3.10`
 
 #### Using [uv](https://docs.astral.sh/uv/) (recommended)
 
@@ -156,6 +202,8 @@ Documentation along with a quick start guide can be found on the [docs website](
 
 ## Citation
 
+Please cite [our paper](https://github.com/ComplexData-MILA/AIF-Gen) if your use this code in your own work:
+
 ```
 @article{TODO,
   title   = "TODO",
@@ -167,6 +215,8 @@ Documentation along with a quick start guide can be found on the [docs website](
 ```
 
 ## Contributing
+
+If you notice anything unexpected, or would like to propose a new feature, please open an [issue](https://github.com/ComplexData-MILA/AIF-Gen/issues) and feel free [to discuss them with us](https://github.com/ComplexData-MILA/AIF-Gen/discussions).
 
 To learn more about making a contribution to AIF-Gen see our [contribution guide](./.github/CONTRIBUTING.md).
 
