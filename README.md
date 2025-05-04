@@ -128,7 +128,7 @@ task_specs:
   - num_samples: 5
     alignment_task:
       objective: 'Ask an interesting philosophy question'
-      preference: 'Explain the answer at a level that could be understood by a 5 year old'
+      preference: 'Explain the answer at an expert level. Draw from technical literature.
       domain:
         philosophy:
           seed_words: # Change up some seed words for variety
