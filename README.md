@@ -17,14 +17,22 @@
 
 ## About The Project
 
-AIF-Gen is a Python library that generates (continual) RLHF preference datasets
+AIF-Gen is a platform for generating synthetic RLHF datasets for lifelong reinforcement learning on LLMs.
+
+It's main goal is to facilitate preference data generation at scale via [RL from AI feedback](https://arxiv.org/abs/2309.00267). AIF-Gen natively supports evolving preferences making it especially useful for studying non-stationary domains such as tutoring. Think of it like [Procgen](https://github.com/openai/procgen), but for RLHF.
+
+You can find sample datasets and model artifacts generated with AIF-Gen on [our HuggingFace page](https://huggingface.co/datasets/ComplexDataLab/aif-gen).
+
+### Library Highlights
+
+### Architecture Overview
 
 ![image](./docs/img/architecture-dark.svg#gh-dark-mode-only)
 ![image](./docs/img/architecture-light.svg#gh-light-mode-only)
 
-### Library Highlights
-
 ## Quick Tour for New Users
+
+AIF-Gen is primarily designed
 
 We expose the following cli:
 
@@ -93,7 +101,7 @@ uv run aif transform
 
 The current recommended way to install AIF-Gen is from source.
 
-### With [uv](https://docs.astral.sh/uv/) (recommended)
+#### With [uv](https://docs.astral.sh/uv/) (recommended)
 
 ```sh
 # Create and activate your venv
@@ -106,7 +114,7 @@ uv pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
 aif
 ```
 
-### Without uv
+#### With [pip](https://pip.pypa.io/en/stable/installation/)
 
 ```sh
 # Create and activate your venv
@@ -137,6 +145,6 @@ Documentation along with a quick start guide can be found on the [docs website](
 
 ## Contributing
 
-To learn more about making a contribution to AIF-Gen see our [contribution page](./.github/CONTRIBUTING.md).
+To learn more about making a contribution to AIF-Gen see our [contribution guide](./.github/CONTRIBUTING.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
