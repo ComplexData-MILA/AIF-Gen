@@ -10,6 +10,7 @@ nav:
       - Architecture: architecture.md
       - CLI: cli.md
       - Benchmarks: benchmarks.md
+      - Environment Variables: env_vars.md
       - API Reference:
           - dataset.md
           - task.md
