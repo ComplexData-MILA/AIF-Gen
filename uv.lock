@@ -84,7 +84,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "openai", specifier = ">=1.61.1" },
     { name = "pydantic", specifier = ">=2.10.4" },
-    { name = "torch", specifier = "==2.6.0" },
+    { name = "torch", specifier = ">=2.6.0" },
 ]
 
 [package.metadata.requires-dev]
