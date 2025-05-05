@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import pathlib
 from typing import Any, Dict, Optional
 
@@ -45,20 +44,14 @@ from aif_gen.validation import (
 @click.option(
     '--validate-llm-judge/--no-validate-llm-judge',
     is_flag=True,
-    default=True,
+    default=False,
     help='Perform llm judge validation on the dataset.',
 )
 @click.option(
     '--validate-embedding-diversity/--no-validate-embedding-diversity',
     is_flag=True,
-    default=True,
+    default=False,
     help='Perform embedding similarity/diversity validation on the dataset.',
-)
-@click.option(
-    '--num-workers',
-    type=click.IntRange(min=1, max=64, clamp=True),
-    help='Number of sub-process workers to spawn for computing diversity validation.',
-    default=os.cpu_count(),
 )
 @click.option(
     '--model',
@@ -114,7 +107,6 @@ def validate(
     validate_entropy: bool,
     validate_llm_judge: bool,
     validate_embedding_diversity: bool,
-    num_workers: int,
     model: str,
     embedding_model: str,
     embedding_batch_size: int,
@@ -176,11 +168,6 @@ def validate(
         logging.info(
             f'Performing embedding diversity validation with model: {embedding_model}'
         )
-        if embedding_model is None:
-            raise ValueError(
-                '--embedding-model is required for embedding diversity validation.'
-            )
-
         try:
             client = openai.AsyncOpenAI()
             async_semaphore = asyncio.Semaphore(max_concurrency)

@@ -1,27 +1,34 @@
 # Command Line Interface
 
-Under construction
+AIF-Gen is intended to be primarily used as a command line tool:
 
-## Generate
+```console
+foo@bar:~$ aif --help
 
-::: aif_gen.cli.commands.generate
+          / _ | /  _/ __/ / ___/ __/ |/ /
+         / __ |_/ // _/  / (_ / _//    /
+        /_/ |_/___/_/    \___/___/_/|_/
 
-## Merge
+A tool for generating synthetic continual RLHF datasets.
 
-::: aif_gen.cli.commands.merge
+Usage: aif [OPTIONS] COMMAND [ARGS]...
 
-## Preview
+Options:
+  --log_file FILE  Optional log file to use.  [default: aif_gen.log]
+  --help           Show this message and exit.
 
-::: aif_gen.cli.commands.preview
+Commands:
+  generate   Generate a new ContinualAlignmentDataset.
+  merge      Merge a set of ContinualAlignmentDatasets.
+  preview    Preview a ContinualAlignmentDataset.
+  sample     Downsample a ContinualAlignmentDataset.
+  transform  Transform a ContinualAlignmentDataset.
+  validate   Validate a ContinualAlignmentDataset.
+```
 
-## Sample
-
-::: aif_gen.cli.commands.sample
-
-## Transform
-
+::: aif_gen.cli.commands.generate.generate
+::: aif_gen.cli.commands.merge.merge
+::: aif_gen.cli.commands.preview.preview
+::: aif_gen.cli.commands.sample.sample
 ::: aif_gen.cli.commands.transform
-
-## Validate
-
-::: aif_gen.cli.commands.validate
+::: aif_gen.cli.commands.validate.validate

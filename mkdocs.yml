@@ -7,10 +7,9 @@ nav:
   - Home:
       - index.md
       - Quickstart: quickstart.md
-      - CLI:
-          - cli.md
-      - Benchmarks:
-          - benchmarks.md
+      - Architecture: architecture.md
+      - CLI: cli.md
+      - Benchmarks: benchmarks.md
       - API Reference:
           - dataset.md
           - task.md
