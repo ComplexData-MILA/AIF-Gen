@@ -6,9 +6,6 @@ AIF-Gen is a platform for generating synthetic RLHF datasets for lifelong reinfo
 
 Our main goal is to facilitate preference data generation at scale via [RL from AI feedback](https://arxiv.org/abs/2309.00267). AIF-Gen natively supports evolving preferences making it especially useful for studying non-stationary domains such as tutoring. Think of it like [Procgen](https://github.com/openai/procgen), but for RLHF.
 
-> \[!NOTE\]
-> AIF-Gen is still alpha software, and may introduce breaking changes.
-
 ### Library Highlights
 
 - ⚡ Asynchronous LLM batch inference powered by [vLLM](https://github.com/vllm-project/vllm)
@@ -17,25 +14,34 @@ Our main goal is to facilitate preference data generation at scale via [RL from 
 - ✅ Validation metrics to judge synthetic data quality
 - 🤗 Direct integration with HuggingFace for robust dataset management
 
-## Installing from source:
+## Installation:
 
-### Prerequisites
+The current recommended way to install AIF-Gen is from source.
 
-AIF-GEN uses [uv](https://docs.astral.sh/uv/) to manage and lock project dependencies for a consistent and reproducible environment.
-If you do not have `uv` installed on your system, visit [this page](https://docs.astral.sh/uv/getting-started/installation/) for installation instructions.
-
-**Note**: If you have `pip` installed globally you can just invoke:
+#### Using [uv](https://docs.astral.sh/uv/) (recommended)
 
 ```sh
-pip install uv
+# Create and activate your venv
+uv venv my_venv --python 3.10 && source my_venv/bin/activate
+
+# Install the wheels into the venv
+uv pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
+
+# Test the install
+aif
 ```
 
-### Clone the repository
+#### Using [pip](https://pip.pypa.io/en/stable/installation/)
 
-```bash
-git clone https://github.com/ComplexData-MILA/AIF-Gen.git
-cd AIF-Gen
-uv sync
+```sh
+# Create and activate your venv
+python3.10 -m venv my_venv && source my_venv/bin/activate
+
+# Install the wheels into the venv
+pip install git+https://github.com/ComplexData-MILA/AIF-Gen.git
+
+# Test the install
+aif
 ```
 
 For more details, see the [contribution guide](../.github/CONTRIBUTING.md).

@@ -2,12 +2,7 @@
 
 **High-Level Design and Architecture of AIF-GEN**
 
-1. User configures a series of `Alignment Tasks` through `YAML` files which encapsulate an evolving RLHF specification:
-
-   - objective (e.g. QNA)
-   - preference (e.g. Answer shortly and ELI5)
-   - domain (e.g. education, math topics)
-   - metadata (e.g. sample count, model temperature)
+1. User configures a series of `Alignment Tasks` through `YAML` files which encapsulate an evolving RLHF specification: *objective* (e.g. QNA), *preference* (e.g. Answer shortly and ELI5), *domain* (e.g. education, math topics), *metadata* (e.g. sample count, model temperature)
 
 1. The `Prompt Mapper` generates a *meta-prompt* using each `Alignment Task` specification
 

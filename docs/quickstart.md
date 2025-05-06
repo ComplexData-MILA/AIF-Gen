@@ -94,7 +94,7 @@ We can run various validation metrics on our generated data:
 - Basic Validation (sample counts, token entropy)
 - LLM Validation
   - *embedding diversity*: use the cosine distance of embeddings from an embedding model as a proxy for dataset diversity
-  - *llm judge*: use an auxilary LLM to judge the quality of the dataset responses
+  - *llm judge*: use an auxiliary LLM to judge the quality of the dataset responses
 
 The LLM validations require that an embedding model, or chat completion model is being served on an vLLM inference server. The same procedure that was used for generation works here.
 
@@ -118,7 +118,7 @@ aif validate data/sample_data.json embedding_validation.json --validate-embeddin
 
 #### LLM Judge with a Chat Completion Model
 
-We can use a seperate model to judge the chosen/rejected ranking quality. We'll assume we have `codellama/CodeLlama-7b-Instruct-hf` as our model, ready to serve on a local vLLM server. We can then issue:
+We can use a separate model to judge the chosen/rejected ranking quality. We'll assume we have `codellama/CodeLlama-7b-Instruct-hf` as our model, ready to serve on a local vLLM server. We can then issue:
 
 ```sh
 aif validate data/sample_data.json llm_judge_validation.json --validate-llm-judge --model codellama/CodeLlama-7b-Instruct-hf
@@ -132,7 +132,7 @@ We created a simple CLI command (`aif preview`), that allows you to loop through
 
 ### Dataset Split and HuggingFace Upload
 
-Once we are happy with our data, we can create a train/test split and upload to HuggingFace. Since we are uploading to HuggingFace, we'll need to export our `HF_TOKEN` enviornment variable:
+Once we are happy with our data, we can create a train/test split and upload to HuggingFace. Since we are uploading to HuggingFace, we'll need to export our `HF_TOKEN` environment variable:
 
 ```sh
 export HF_TOKEN="..."
