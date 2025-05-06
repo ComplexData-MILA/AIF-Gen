@@ -32,7 +32,7 @@ def mock_score(monkeypatch, request):
         return score, kwargs.get('dataset_idx'), kwargs.get('metric_name')
 
     monkeypatch.setattr(
-        'aif_gen.dataset.validation.llm_judge._get_score',
+        'aif_gen.validation.llm_judge._get_score',
         fake_get_alignment_score,
     )
     return score

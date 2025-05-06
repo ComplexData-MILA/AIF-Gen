@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import pathlib
 from typing import Any, Dict, Optional
 
@@ -11,15 +10,14 @@ import openai
 from aif_gen.dataset.continual_alignment_dataset import (
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation import (
+from aif_gen.util.hf import download_from_hf, upload_to_hf
+from aif_gen.util.seed import seed_everything
+from aif_gen.validation import (
     count_validation,
-    diversity_validation,
     entropy_validation,
     llm_embedding_diversity,
     llm_judge_validation,
 )
-from aif_gen.util.hf import download_from_hf, upload_to_hf
-from aif_gen.util.seed import seed_everything
 
 
 @click.command(context_settings={'show_default': True})
@@ -44,28 +42,16 @@ from aif_gen.util.seed import seed_everything
     help='Perform entropy validation on the dataset.',
 )
 @click.option(
-    '--validate-diversity/--no-validate-diversity',
-    is_flag=True,
-    default=True,
-    help='Perform diversity validation on the dataset.',
-)
-@click.option(
     '--validate-llm-judge/--no-validate-llm-judge',
     is_flag=True,
-    default=True,
+    default=False,
     help='Perform llm judge validation on the dataset.',
 )
 @click.option(
     '--validate-embedding-diversity/--no-validate-embedding-diversity',
     is_flag=True,
-    default=True,
+    default=False,
     help='Perform embedding similarity/diversity validation on the dataset.',
-)
-@click.option(
-    '--num-workers',
-    type=click.IntRange(min=1, max=64, clamp=True),
-    help='Number of sub-process workers to spawn for computing diversity validation.',
-    default=os.cpu_count(),
 )
 @click.option(
     '--model',
@@ -119,10 +105,8 @@ def validate(
     output_validation_file: pathlib.Path,
     validate_count: bool,
     validate_entropy: bool,
-    validate_diversity: bool,
     validate_llm_judge: bool,
     validate_embedding_diversity: bool,
-    num_workers: int,
     model: str,
     embedding_model: str,
     embedding_batch_size: int,
@@ -158,11 +142,6 @@ def validate(
         results['entropy_validation'] = entropy_validation(dataset)
         logging.info('Finished entropy validation')
 
-    if validate_diversity:
-        logging.info('Performing diversity validation')
-        results['diversity_validation'] = diversity_validation(dataset, num_workers)
-        logging.info('Finished diversity validation')
-
     if validate_llm_judge:
         logging.info(f'Performing LLM judge validation with model: {model}')
 
@@ -189,11 +168,6 @@ def validate(
         logging.info(
             f'Performing embedding diversity validation with model: {embedding_model}'
         )
-        if embedding_model is None:
-            raise ValueError(
-                '--embedding-model is required for embedding diversity validation.'
-            )
-
         try:
             client = openai.AsyncOpenAI()
             async_semaphore = asyncio.Semaphore(max_concurrency)

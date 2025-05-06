@@ -3,7 +3,9 @@ from aif_gen.dataset import (
     AlignmentDatasetSample,
     ContinualAlignmentDataset,
 )
-from aif_gen.dataset.validation import entropy_validation
+from aif_gen.task.alignment_task import AlignmentTask
+from aif_gen.task.domain import Domain
+from aif_gen.validation import entropy_validation
 
 
 def test_entropy_validation_all_unique():
@@ -18,14 +20,15 @@ def test_entropy_validation_all_unique():
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5232109529528914,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -43,14 +46,15 @@ def test_entropy_validation_all_same_prompts():
             'Mock prompt A 2', 'Winning Response C 2', 'Losing Response C 2'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5024938932551737,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -68,14 +72,15 @@ def test_entropy_validation_all_same_responses():
             'Mock prompt C 3', 'Winning Response A 3', 'Losing Response B 3'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.496481079820755,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -93,14 +98,15 @@ def test_entropy_validation_all_same_everything():
             'Mock prompt A 4', 'Winning Response A 4', 'Losing Response A 4'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.3034884952192693,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -112,14 +118,15 @@ def test_entropy_validation_no_response_entropy():
         AlignmentDatasetSample('Mock prompt B 5', 'foo foo foo', 'bar bar bar'),
         AlignmentDatasetSample('Mock prompt C 5', 'foo foo foo', 'bar bar bar'),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': -0.0,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': -0.0,
-            'token_entropy': 2.289294054503374,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -137,14 +144,15 @@ def test_entropy_validation_no_prompt_entropy():
             'foo foo foo', 'Winning Response C 6', 'Losing Response C 6'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': -0.0,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.465931856301205,
         }
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -162,7 +170,9 @@ def test_entropy_countinual_dataset():
             'Mock prompt C 1', 'Winning Response C 1', 'Losing Response C 1'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset_one = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -176,7 +186,6 @@ def test_entropy_countinual_dataset():
             'Mock prompt A 2', 'Winning Response C 2', 'Losing Response C 2'
         ),
     ]
-    mock_task = None
     dataset_two = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -190,7 +199,6 @@ def test_entropy_countinual_dataset():
             'Mock prompt C 3', 'Winning Response A 3', 'Losing Response B 3'
         ),
     ]
-    mock_task = None
     dataset_three = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -204,7 +212,6 @@ def test_entropy_countinual_dataset():
             'Mock prompt A 4', 'Winning Response A 4', 'Losing Response A 4'
         ),
     ]
-    mock_task = None
     dataset_four = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -212,7 +219,6 @@ def test_entropy_countinual_dataset():
         AlignmentDatasetSample('Mock prompt B 5', 'foo foo foo', 'bar bar bar'),
         AlignmentDatasetSample('Mock prompt C 5', 'foo foo foo', 'bar bar bar'),
     ]
-    mock_task = None
     dataset_five = AlignmentDataset(task=mock_task, samples=samples)
 
     samples = [
@@ -226,7 +232,6 @@ def test_entropy_countinual_dataset():
             'foo foo foo', 'Winning Response C 6', 'Losing Response C 6'
         ),
     ]
-    mock_task = None
     dataset_six = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = []
 
@@ -246,37 +251,31 @@ def test_entropy_countinual_dataset():
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5232109529528914,
         },
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.660947433286918,
-            'token_entropy': 2.5024938932551737,
         },
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.496481079820755,
         },
         {
             'chosen_entropy': 1.3862943611198906,
             'prompt_entropy': 1.3862943611198906,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.3034884952192693,
         },
         {
             'chosen_entropy': -0.0,
             'prompt_entropy': 1.660947433286918,
             'rejected_entropy': -0.0,
-            'token_entropy': 2.289294054503374,
         },
         {
             'chosen_entropy': 1.660947433286918,
             'prompt_entropy': -0.0,
             'rejected_entropy': 1.3862943611198906,
-            'token_entropy': 2.465931856301205,
         },
     ]
     assert entropy_validation(dataset) == expected_entropy
@@ -294,14 +293,15 @@ def test_entropy_validation_stop_words_removed():
             'with Mock prompt A 4', 'by Winning Response A 4', 'is Losing Response A 4'
         ),
     ]
-    mock_task = None
+    mock_task = AlignmentTask(
+        domain=Domain.from_dict({'education': {}}), objective='', preference=''
+    )
     dataset = AlignmentDataset(task=mock_task, samples=samples)
     expected_entropy = [
         {
             'chosen_entropy': 1.0986122886681096,
             'prompt_entropy': 1.0986122886681096,
             'rejected_entropy': 1.0986122886681096,
-            'token_entropy': 2.253857589601352,
         }
     ]
     assert entropy_validation(dataset, remove_stop_words=True) == expected_entropy

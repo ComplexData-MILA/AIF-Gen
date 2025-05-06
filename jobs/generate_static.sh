@@ -10,5 +10,5 @@
 
 source .env
 uv run aif generate --max_concurrency 256 \
-                    config/static/education_qna_hinted.yaml \
-                    $GENERATION_MODEL_NAME
+    config/static/education_qna_hinted.yaml \
+    $GENERATION_MODEL_NAME

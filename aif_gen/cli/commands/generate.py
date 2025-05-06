@@ -9,7 +9,7 @@ import click
 import openai
 import yaml  # type: ignore
 
-from aif_gen.generate.service import generate_continual_dataset
+from aif_gen.generate.engine import generate_continual_dataset
 from aif_gen.util.hf import upload_to_hf
 from aif_gen.util.path import get_run_id
 from aif_gen.util.seed import seed_everything

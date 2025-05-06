@@ -1,16 +1,17 @@
 import logging
 import pathlib
-from typing import Union
 
 from huggingface_hub import HfApi, hf_hub_download
 
 
-def upload_to_hf(repo_id: str, local_path: Union[str, pathlib.Path]) -> None:
-    r"""Upload a local dataset to a remote HuggingFace repository. Assumes the client is authenticated.
+def upload_to_hf(repo_id: str, local_path: str | pathlib.Path) -> None:
+    r"""Upload a local dataset to a remote HuggingFace repository.
 
     Args:
         repo_id (str): The name of the HuggingFace dataset repository.
         local_path (Union[str, pathlib.Path]): Local path to upload, either a single file, or directory.
+
+    Note: Assumes the client is authenticated.
     """
     local_path = pathlib.Path(local_path)
 
@@ -39,8 +40,8 @@ def upload_to_hf(repo_id: str, local_path: Union[str, pathlib.Path]) -> None:
         logging.info(f'Uploaded local folder: {local_path} to {repo_id}')
 
 
-def download_from_hf(repo_id: str, filename: Union[str, pathlib.Path]) -> pathlib.Path:
-    r"""Download a remote HuggingFace dataset to the local file system. Assumes the client is authenticated.
+def download_from_hf(repo_id: str, filename: str | pathlib.Path) -> pathlib.Path:
+    r"""Download a remote HuggingFace dataset to the local file system.
 
     Args:
         repo_id (str): The name of the HuggingFace dataset repository.
@@ -48,6 +49,8 @@ def download_from_hf(repo_id: str, filename: Union[str, pathlib.Path]) -> pathli
 
     Returns:
         Absolute path on the local filesystem where the data was downloaded.
+
+    Note: Assumes the client is authenticated.
     """
     if isinstance(filename, pathlib.Path):
         filename = str(filename)

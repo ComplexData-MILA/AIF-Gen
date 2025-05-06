@@ -2,14 +2,11 @@ import pathlib
 
 import click
 
-from aif_gen.cli.commands.filter import filter_dataset
 from aif_gen.cli.commands.generate import generate
 from aif_gen.cli.commands.merge import merge
 from aif_gen.cli.commands.preview import preview
 from aif_gen.cli.commands.sample import sample
-from aif_gen.cli.commands.split import split
 from aif_gen.cli.commands.transform import transform
-from aif_gen.cli.commands.transmute import transmute
 from aif_gen.cli.commands.validate import validate
 from aif_gen.util.logging import setup_basic_logging
 
@@ -21,7 +18,7 @@ class RichGroup(click.Group):
          / __ |_/ // _/  / (_ / _//    /
         /_/ |_/___/_/    \___/___/_/|_/"""
 
-        s += '\n\nA tool for synthetically generating continual RLHF datasets.\n\n'
+        s += '\n\nA tool for generating synthetic continual RLHF datasets.\n\n'
 
         formatter.write(s)
         super().format_help(ctx, formatter)
@@ -43,10 +40,7 @@ cli.add_command(validate)
 cli.add_command(preview)
 cli.add_command(merge)
 cli.add_command(transform)
-cli.add_command(split)
 cli.add_command(sample)
-cli.add_command(transmute)
-cli.add_command(filter_dataset)
 
 if __name__ == '__main__':
     cli()
