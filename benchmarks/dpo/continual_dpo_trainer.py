@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import wandb as wb
 from accelerate import Accelerator, PartialState
 from accelerate.utils import gather_object
 from datasets import Dataset
@@ -36,6 +35,8 @@ from trl.trainer.utils import (
     prepare_deepspeed,
 )
 from typing_extensions import override
+
+import wandb as wb
 
 
 @dataclass
@@ -97,13 +98,6 @@ class ContinualDPOConfig(DPOConfig):
     eval_greedy_policy: bool = field(
         default=False,
         metadata={'help': 'Whether to use greedy policy for evaluation.'},
-    )
-    # https://github.com/huggingface/trl/blob/56e57662053e2d0cc6302dad404820b0c0ec6a91/trl/trainer/utils.py#L1086
-    num_sample_generations: int = field(
-        default=10,
-        metadata={
-            'help': 'Number of debugging samples generations (i.e., `generate_completions` calls) throughout training.'
-        },
     )
 
 
@@ -350,7 +344,6 @@ class ContinualDPOTrainer(DPOTrainer):
             top_p=1.0,
             do_sample=True,
         )
-
         table = defaultdict(list)
         with torch.no_grad():
             with unwrap_model_for_generation(
@@ -391,10 +384,10 @@ class ContinualDPOTrainer(DPOTrainer):
                     scores = (
                         self.accelerator.gather_for_metrics(score).float().cpu().numpy()
                     )
-
                     table['query'].extend(queries)
                     table['model response'].extend(responses)
                     table['score'].extend(scores)
+                    break
 
         df = pd.DataFrame(table)
         if self.accelerator.is_main_process and wb.run is not None:
