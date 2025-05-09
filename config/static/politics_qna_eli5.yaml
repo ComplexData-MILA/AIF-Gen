@@ -1,8 +1,0 @@
----
-task_specs:
-  - num_samples: 10000
-    alignment_task:
-      objective: "Ask a political (you choose randomly what topic in politics) question. The prompt is merely a literal question and nothing else please."
-      preference: 'Summarize the body of text at a level that could be understood by a five year old.'
-      domain:
-        politics:
