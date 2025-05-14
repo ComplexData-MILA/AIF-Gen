@@ -31,6 +31,9 @@ def test_count_validation_all_unique():
             'unique_prompts': 3,
             'unique_chosen': 3,
             'unique_rejected': 3,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         }
     ]
     assert count_validation(dataset) == expected_counts
@@ -59,6 +62,9 @@ def test_count_validation_all_same_prompts():
             'unique_prompts': 1,
             'unique_chosen': 3,
             'unique_rejected': 3,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         }
     ]
     assert count_validation(dataset) == expected_counts
@@ -87,6 +93,9 @@ def test_count_validation_all_same_responses():
             'unique_prompts': 3,
             'unique_chosen': 1,
             'unique_rejected': 1,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         }
     ]
     assert count_validation(dataset) == expected_counts
@@ -115,6 +124,9 @@ def test_count_validation_all_same_everything():
             'unique_prompts': 1,
             'unique_chosen': 1,
             'unique_rejected': 1,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         }
     ]
     assert count_validation(dataset) == expected_counts
@@ -187,6 +199,9 @@ def test_count_countinual_dataset():
             'unique_prompts': 3,
             'unique_chosen': 3,
             'unique_rejected': 3,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         },
         {
             'sample': 3,
@@ -194,6 +209,9 @@ def test_count_countinual_dataset():
             'unique_prompts': 1,
             'unique_chosen': 3,
             'unique_rejected': 3,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         },
         {
             'sample': 3,
@@ -201,6 +219,9 @@ def test_count_countinual_dataset():
             'unique_prompts': 3,
             'unique_chosen': 1,
             'unique_rejected': 1,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         },
         {
             'sample': 3,
@@ -208,6 +229,9 @@ def test_count_countinual_dataset():
             'unique_prompts': 1,
             'unique_chosen': 1,
             'unique_rejected': 1,
+            'avg_prompt_length': 4.0,
+            'avg_chosen_length': 4.0,
+            'avg_rejected_length': 4.0,
         },
     ]
     assert count_validation(dataset) == expected_counts
@@ -236,6 +260,9 @@ def test_count_validation_stop_words_removed():
             'unique_prompts': 1,
             'unique_chosen': 1,
             'unique_rejected': 1,
+            'avg_prompt_length': 5.0,
+            'avg_chosen_length': 5.0,
+            'avg_rejected_length': 5.0,
         }
     ]
     assert count_validation(dataset, remove_stop_words=True) == expected_counts
