@@ -118,13 +118,6 @@ class CPPOConfig(PPOConfig):
 
 
 class CPPOTrainer(PPOTrainer):
-    # Shared accelerator instance across all trainer instances
-    shared_accelerator: Optional[Accelerator] = None
-    current_task_index: Optional[int] = None
-    policy_value_models: Any  # the policy and value model wrapper
-    ds_wrapped_models: Any  # TODO work with this after deepspeed is initialized
-    accelerator: Accelerator  # now non-optional after creation
-    ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
 
     def __init__(
         self,
@@ -153,6 +146,14 @@ class CPPOTrainer(PPOTrainer):
         old_logprobs: Optional[Tensor] = None,
         old_rewards: Optional[Tensor] = None,
     ):
+        self.shared_accelerator: Optional[Accelerator] = None
+        self.current_task_index: Optional[int] = None
+        self.policy_value_models: Any = None  # the policy and value model wrapper
+        self.ds_wrapped_models: Any = None  # TODO work with this after deepspeed is initialized
+        self.accelerator: Accelerator = None  # now non-optional after creation
+        self.ref_model: Optional[Union[PreTrainedModel, nn.Module]] = None
+
+
         # Basic setup and validation
         if args is None:
             raise ValueError('`args` cannot be None')
@@ -175,18 +176,18 @@ class CPPOTrainer(PPOTrainer):
         # Initialize task tracking
         self._stored_metrics: Dict = defaultdict(lambda: defaultdict(list))
         self.current_task = (
-            f'task_{CPPOTrainer.current_task_index}'
-            if CPPOTrainer.current_task_index is not None
+            f'task_{self.current_task_index}'
+            if self.current_task_index is not None
             else 'task_0'
         )
 
         # Set up task index tracking
         is_first_task = False
-        if CPPOTrainer.current_task_index is None:
-            CPPOTrainer.current_task_index = 0
+        if self.current_task_index is None:
+            self.current_task_index = 0
             is_first_task = True
         else:
-            CPPOTrainer.current_task_index += 1
+            self.current_task_index += 1
         self.is_final_eval = False
 
         # Store basic configuration
@@ -247,7 +248,7 @@ class CPPOTrainer(PPOTrainer):
             else:
                 self.ref_model = create_reference_model(self.policy_model)
 
-            CPPOTrainer.class_ref_model = self.ref_model
+            self.class_ref_model = self.ref_model
 
         else:
             # For subsequent tasks, reuse the reference model
@@ -284,14 +285,14 @@ class CPPOTrainer(PPOTrainer):
             args.total_episodes = int(args.num_train_epochs * self.train_dataset_len)
 
         # Setup accelerator - shared across all tasks
-        if CPPOTrainer.shared_accelerator is None:
+        if self.shared_accelerator is None:
             accelerator = Accelerator(
                 gradient_accumulation_steps=args.gradient_accumulation_steps
             )
             self.accelerator = accelerator
-            CPPOTrainer.shared_accelerator = accelerator
+            self.shared_accelerator = accelerator
         else:
-            self.accelerator = CPPOTrainer.shared_accelerator
+            self.accelerator = self.shared_accelerator
             self.gather_function = self.accelerator.gather_for_metrics
             if (
                 'use_gather_object'
@@ -331,7 +332,7 @@ class CPPOTrainer(PPOTrainer):
         args.num_total_batches = math.ceil(args.total_episodes / args.batch_size)
         time_tensor = torch.tensor(int(time.time()), device=self.accelerator.device)
         time_int = broadcast(time_tensor, 0).item()
-        args.run_name = f'{args.exp_name}__{args.seed}__{time_int}'
+        # args.run_name = f'{args.exp_name}__{args.seed}__{time_int}'
         self.local_seed = args.seed + self.accelerator.process_index * 100003  # Prime
         if args.num_sample_generations > 0:
             self.sample_generations_freq = max(
@@ -353,11 +354,12 @@ class CPPOTrainer(PPOTrainer):
 
             # Create policy and value model wrapper
             self.model = PolicyAndValueWrapper(self.policy_model, self.value_model)
-            CPPOTrainer.policy_value_models = self.model
+            self.policy_value_models = self.model
             self.model.config = self.policy_model.config  # needed for pushing to hub
         else:
+            disable_dropout_in_model(self.reward_model)
             # Subsequent tasks: Reuse existing model
-            self.model = CPPOTrainer.policy_value_models
+            self.model = self.policy_value_models
             self.model.config = self.policy_model.config  # needed for pushing to hub
 
         # Always create optimizer and scheduler for each task
@@ -425,14 +427,14 @@ class CPPOTrainer(PPOTrainer):
             self.model, self.optimizer, self.dataloader = self.accelerator.prepare(
                 self.model, self.optimizer, self.dataloader
             )
-            CPPOTrainer.ds_wrapped_models = self.model
+            self.ds_wrapped_models = self.model
         else:
             # For subsequent tasks, only prepare optimizer and dataloader
             self.optimizer, self.dataloader = self.accelerator.prepare(
                 self.optimizer, self.dataloader
             )
             # Reuse the model from the first task
-            self.model = CPPOTrainer.ds_wrapped_models
+            self.model = self.ds_wrapped_models
 
         torch.manual_seed(self.local_seed)  # Reset local seed
 
@@ -469,10 +471,10 @@ class CPPOTrainer(PPOTrainer):
                     args.fp16,
                     args.bf16,
                 )
-                CPPOTrainer.class_ref_model = self.ref_model
+                self.class_ref_model = self.ref_model
             else:
                 # Reuse prepared ref_model on subsequent tasks
-                self.ref_model = CPPOTrainer.class_ref_model
+                self.ref_model = self.class_ref_model
         else:
             # Non-DeepSpeed path
             if self.ref_model is None:
@@ -483,10 +485,10 @@ class CPPOTrainer(PPOTrainer):
             elif is_first_task:
                 # Only move ref_model to device on first task
                 self.ref_model = self.ref_model.to(self.accelerator.device)  # type: ignore
-                CPPOTrainer.class_ref_model = self.ref_model
+                self.class_ref_model = self.ref_model
             else:
                 # Reuse ref_model on subsequent tasks
-                self.ref_model = CPPOTrainer.class_ref_model
+                self.ref_model = self.class_ref_model
 
             # Always move reward model to device
             self.reward_model = self.reward_model.to(self.accelerator.device)  # type: ignore
@@ -1019,15 +1021,15 @@ class CPPOTrainer(PPOTrainer):
         if self.ref_model is None and original_ref_model is not None:
             print('Reference model was cleared during training - restoring')
             self.ref_model = original_ref_model
-            CPPOTrainer.class_ref_model = original_ref_model
+            self.class_ref_model = original_ref_model
 
         # Ensure the class variable is updated
-        CPPOTrainer.class_ref_model = self.ref_model
+        self.class_ref_model = self.ref_model
         if self.is_deepspeed_enabled:
-            CPPOTrainer.ds_wrapped_models = self.deepspeed
+            self.ds_wrapped_models = self.deepspeed
         else:
-            CPPOTrainer.ds_wrapped_models = self.model
-        CPPOTrainer.policy_value_models = self.model
+            self.ds_wrapped_models = self.model
+        self.policy_value_models = self.model
 
     def evaluate(self) -> Dict[str, float]:
         """Custom evaluation method for PPO. Generates completions from the evaluation dataloader,
@@ -1240,32 +1242,29 @@ class CPPOTrainer(PPOTrainer):
         self.is_final_eval = is_final
         return self
 
-    def save_model(
-        self, output_dir: Optional[str] = None, _internal_call: bool = False
-    ) -> None:
-        """Save the model, dealing with the case where it's a PEFT model without a policy attribute."""
-        # Store the original model
-        original_model = self.model
+    def save_model(self, output_dir: str, _internal_call=True) -> None:
+        """
+        Manually save the model (and training state) to a specified directory.
+        This follows a similar procedure as _save_checkpoint.
+        """
 
-        # For PEFT models (which lack .policy attribute), use the model directly
-        if hasattr(self.model, 'base_model'):
-            # PEFT model case - don't try to access .policy
-            pass  # Keep the model as is
-        elif hasattr(self.model, 'policy'):
-            # Standard PPO case - use the policy as in the original implementation
-            self.model = self.model.policy
-        elif hasattr(self.model, 'policy_model'):
-            # Standard PPO case - use the policy_model as in the original implementation
-            self.model = self.model.policy_model
+        # Save the model files to output_dir (marking _internal_call True)
+        from transformers import Trainer  # ensure Trainer is imported
+        Trainer.save_model(self, output_dir, _internal_call=True)
 
-        # Call the parent class's save_model
-        if output_dir is None:
-            output_dir = self.args.output_dir
+        # If not saving only the model, save optimizer, scheduler, and RNG state
+        if not self.args.save_only_model:
+            self._save_optimizer_and_scheduler(output_dir)
+            self._save_scaler(output_dir)
+            self._save_rng_state(output_dir)
 
-        Trainer.save_model(self, output_dir, _internal_call)
+        # Save the trainer state
+        trainer_state_path = os.path.join(output_dir, "trainer_state.json")
+        self.state.save_to_json(trainer_state_path)
 
-        # Restore the original model
-        self.model = original_model
+        # Optionally push to hub if that option is enabled
+        if self.args.push_to_hub:
+            self._push_from_checkpoint(output_dir)
 
 
 def get_cppo_plasticity_weights(

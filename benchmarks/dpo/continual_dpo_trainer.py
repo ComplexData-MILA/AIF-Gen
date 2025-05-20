@@ -419,7 +419,7 @@ class ContinualDPOTrainer(DPOTrainer):
 
 
 def print_rich_table(df: pd.DataFrame) -> Table:
-    console = Console()
+    console = Console(markup=False)
     table = Table(show_lines=True)
     for column in df.columns:
         table.add_column(column)

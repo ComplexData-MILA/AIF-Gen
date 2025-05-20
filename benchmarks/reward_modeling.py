@@ -196,9 +196,13 @@ def train_model(
 if __name__ == '__main__':
     parser = HfArgumentParser((ExtendedScriptArguments, RewardConfig, ModelConfig))
     script_args, training_args, model_args = parser.parse_args_into_dataclasses()
-
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_args.model_name_or_path,
+        trust_remote_code=model_args.trust_remote_code,
+        use_fast=True,
+    )
     continual_dataset: list[Dict[str, Dataset]] = init_continual_dataset(
-        script_args.dataset_name, mock=script_args.mock
+        script_args.dataset_name, mock=script_args.mock, tokenizer=tokenizer
     )
 
     if script_args.all_datasets:

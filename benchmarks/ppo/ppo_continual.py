@@ -4,11 +4,6 @@ import os
 
 import torch
 import wandb as wb
-from continual_ppo_trainer import (
-    ContinualPPOArguments,
-    ContinualPPOConfig,
-    ContinualPPOTrainer,
-)
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -21,10 +16,15 @@ from trl import (
     get_kbit_device_map,
     get_peft_config,
     get_quantization_config,
+    setup_chat_format,
 )
-from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
 from benchmarks.dataloading import init_continual_dataset
+from benchmarks.ppo.continual_ppo_trainer import (
+    ContinualPPOArguments,
+    ContinualPPOConfig,
+    ContinualPPOTrainer,
+)
 
 
 def main(
@@ -52,13 +52,7 @@ def main(
         quantization_config=quantization_config,
     )
 
-    # Load main model and (optionally) reference model
     model = str(training_args.sft_model_path)
-    policy = AutoModelForCausalLM.from_pretrained(
-        training_args.sft_model_path,
-        trust_remote_code=model_args.trust_remote_code,
-        **model_kwargs,
-    )
     peft_config = get_peft_config(model_args)
     if peft_config is None:
         ref_policy = AutoModelForCausalLM.from_pretrained(
@@ -69,22 +63,11 @@ def main(
     else:
         ref_policy = None
 
-    # Load value model and policy model (main model)
-    value_model = AutoModelForSequenceClassification.from_pretrained(
-        script_args.value_model_path,
-        trust_remote_code=model_args.trust_remote_code,
-        num_labels=1,
-    )
-
     # Load tokenizer and set chat template if needed
     tokenizer = AutoTokenizer.from_pretrained(
         training_args.sft_model_path,
         trust_remote_code=model_args.trust_remote_code,
     )
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-    if tokenizer.chat_template is None:
-        tokenizer.chat_template = SIMPLE_CHAT_TEMPLATE
 
     # Initialize continual dataset
     continual_dataset: list[dict[str, Dataset]] = init_continual_dataset(
@@ -117,6 +100,37 @@ def main(
 
     # Task Loop
     for i, dataset in enumerate(continual_dataset):
+        # Load main model and (optionally) reference model
+        if i == 0:
+            model_path = training_args.sft_model_path
+            value_model_path = script_args.value_model_path
+        else:
+            model_path = os.path.join(training_args.output_dir, 'last')
+            value_model_path = os.path.join(
+                training_args.output_dir, 'last', 'value_model'
+            )
+        policy = AutoModelForCausalLM.from_pretrained(
+            pretrained_model_name_or_path=model_path,
+            trust_remote_code=model_args.trust_remote_code,
+            **model_kwargs,
+        )
+
+        # Load value model and policy model (main model)
+        try:
+            value_model = AutoModelForSequenceClassification.from_pretrained(
+                value_model_path,
+                trust_remote_code=model_args.trust_remote_code,
+                num_labels=1,
+            )
+        except OSError:
+            # Maybe it was saved as safetensors?
+            value_model = AutoModelForSequenceClassification.from_pretrained(
+                value_model_path,
+                trust_remote_code=model_args.trust_remote_code,
+                num_labels=1,
+                from_tf=True,  # or use `subfolder="safetensors"` if you saved a .safetensors file
+            )
+
         # Build custom repository name for this task
         custom_repo_name = (
             model.split('/')[-1] + '_' + clean_dataset_name + '_PPO_' + str(i)
@@ -129,6 +143,22 @@ def main(
         reward_model = AutoModelForSequenceClassification.from_pretrained(
             training_args.reward_model_path + '_' + str(i), num_labels=1
         )
+
+        for idx, _model in enumerate([policy, value_model, reward_model]):
+            # Align padding tokens between tokenizer and model
+            _model.config.pad_token_id = tokenizer.pad_token_id
+
+            # Use ChatML format if the tokenizer doesn't already have a chat template
+            if tokenizer.chat_template is None:
+                updated_model, updated_tokenizer = setup_chat_format(_model, tokenizer)
+                # Actually store the updated model
+                if idx == 0:
+                    policy = updated_model
+                elif idx == 1:
+                    value_model = updated_model
+                else:
+                    reward_model = updated_model
+                tokenizer = updated_tokenizer
 
         ################
         # Training and Evaluation
@@ -144,9 +174,6 @@ def main(
             eval_dataset=dataset[script_args.dataset_test_split],
             peft_config=peft_config,
         )
-
-        # if i == 0:
-        #     trainer.save_model(os.path.join(training_args.output_dir, 'checkpoint-0'))
 
         # Set current task in trainer for task-based logging
         trainer.set_task(f'task_{i}')
@@ -174,9 +201,17 @@ def main(
                 wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
 
         # Save model checkpoint and optionally push
-        if not training_args.push_to_hub:
-            trainer.save_model(os.path.join(training_args.output_dir, 'last'))
-        else:
+        last_dir = os.path.join(training_args.output_dir, 'last')
+        policy.save_pretrained(last_dir)
+        tokenizer.save_pretrained(last_dir)
+
+        value_model_dir = os.path.join(last_dir, 'value_model')
+        os.makedirs(value_model_dir, exist_ok=True)
+        value_model.save_pretrained(value_model_dir, safe_serialization=False)
+
+        trainer.accelerator.wait_for_everyone()
+
+        if training_args.push_to_hub:
             trainer.push_to_hub(
                 model_name=custom_repo_name,
                 dataset_name='Continual_PPO_' + clean_dataset_name + '_' + str(i),

@@ -112,9 +112,7 @@ class ContinualPPOEWCTrainer(ContinualPPOTrainer):
         # Store EWC-specific parameters
         self.ewc_lambda = args.ewc_lambda
 
-        # Track if we're on the first task
-        is_first_task = ContinualPPOTrainer.current_task_index == 0
-        if is_first_task:
+        if self.current_task_index == 0:
             # Initialize empty dictionaries for first task
             ContinualPPOEWCTrainer.class_fisher_information = {}
             ContinualPPOEWCTrainer.class_old_params = {}
@@ -775,15 +773,15 @@ class ContinualPPOEWCTrainer(ContinualPPOTrainer):
         if self.ref_model is None and original_ref_model is not None:
             print('Reference model was cleared during training - restoring')
             self.ref_model = original_ref_model
-            ContinualPPOTrainer.class_ref_model = original_ref_model
+            self.class_ref_model = original_ref_model
 
         # Ensure the class variable is updated
-        ContinualPPOTrainer.class_ref_model = self.ref_model
+        self.class_ref_model = self.ref_model
         if self.is_deepspeed_enabled:
-            ContinualPPOTrainer.ds_wrapped_models = self.deepspeed
+            self.ds_wrapped_models = self.deepspeed
         else:
-            ContinualPPOTrainer.ds_wrapped_models = self.model
-        ContinualPPOTrainer.policy_value_models = self.model
+            self.ds_wrapped_models = self.model
+        self.policy_value_models = self.model
 
     def update_fisher_and_params(self) -> None:
         """Explicitly update the Fisher information and parameter values.

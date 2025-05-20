@@ -16,8 +16,8 @@ uv sync --group benchmarks
 uv run benchmarks/cppo/cppo.py \
     --dataset_name benchmarks/continual_data_debug.json \
     --sft_model_path Qwen/Qwen2-0.5B-Instruct \
-    --value_model_path Shahradmz/Qwen2-0.5B-Instruct_continual_data_debug_REWARD_0 \
-    --reward_model_path Shahradmz/Qwen2-0.5B-Instruct_continual_data_debug_REWARD \
+    --value_model_path LifelongAlignment/Qwen2.5-0.5B-Instruct_CPPO_REWARD_0 \
+    --reward_model_path LifelongAlignment/Qwen2.5-0.5B-Instruct_CPPO_REWARD \
     --learning_rate 5.0e-6 \
     --num_train_epochs 1 \
     --gradient_accumulation_steps 8 \
@@ -31,7 +31,7 @@ uv run benchmarks/cppo/cppo.py \
     --no_remove_unused_columns \
     --use_peft \
     --lora_r 32 \
-    --lora_alpha 16 \
+    --lora_alpha 16
     --push_to_hub True
 ```
 
