@@ -30,11 +30,11 @@ accelerate launch --config_file benchmarks/cppo/accelerate_configs/deepspeed_zer
     --response_length 256 \
     --num_train_epochs 4 \
     --gradient_checkpointing \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 4 \
     --logging_steps 10 \
     --eval_strategy steps \
     --eval_steps 200 \
     --save_steps 300 \
     --bf16 \
-    --output_dir "$HOME/Qwen2-0.5B-CPPO-${dataset_name}" \
+    --output_dir "/home/s/shahradm/links/projects/aip-rrabba/shared/aifgen_experiments/Qwen2-0.5B-CPPO-${dataset_name}" \
     --no_remove_unused_columns

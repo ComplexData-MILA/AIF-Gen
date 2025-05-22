@@ -36,5 +36,5 @@ accelerate launch --config_file benchmarks/cppo/accelerate_configs/deepspeed_zer
     --eval_steps 200 \
     --save_steps 300 \
     --bf16 \
-    --output_dir "$HOME/Qwen2-0.5B-CPPO-${dataset_name}" \
+    --output_dir "/home/s/shahradm/links/projects/aip-rrabba/shared/aifgen_experiments/Qwen2-0.5B-CPPO-${dataset_name}" \
     --no_remove_unused_columns

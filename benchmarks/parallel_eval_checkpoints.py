@@ -9,6 +9,7 @@ from dpo.continual_dpo_trainer import (
     ContinualDPOConfig,
     ContinualDPOTrainer,
 )
+from safetensors import safe_open
 from transformers import (
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
@@ -30,6 +31,7 @@ def main(
     model_args: ModelConfig,
 ) -> None:
     # Determine torch dtype and quantization configs
+
     torch_dtype = (
         model_args.torch_dtype
         if model_args.torch_dtype in ['auto', None]
@@ -45,14 +47,17 @@ def main(
         revision=model_args.model_revision,
         attn_implementation=model_args.attn_implementation,
         torch_dtype=torch_dtype,
-        use_cache=False if training_args.gradient_checkpointing else True,
         device_map=get_kbit_device_map() if quantization_config is not None else None,
         quantization_config=quantization_config,
     )
 
     # Checkpoint loop
     checkpoint_path = script_args.checkpoint_dir
-    dataset_name = checkpoint_path.split('/')[-2].replace('.', '')
+    if 'DPO' not in checkpoint_path:
+        dataset_name = 'dataset-' + checkpoint_path.split('/')[-2].split('_')[-1]
+    else:
+        dataset_name = checkpoint_path.split('/')[-2].replace('.', '')
+
     checkpoint_step = checkpoint_path.split('/')[-1].replace('.', '')
     print(
         f'Evaluating checkpoint: {checkpoint_step} trained on dataset: {dataset_name} on all tasks'
@@ -60,11 +65,29 @@ def main(
     checkpoint_name = dataset_name + '_' + checkpoint_step
     print('checkpoint_name', checkpoint_name)
 
-    model = AutoModelForCausalLM.from_pretrained(
-        checkpoint_path,
-        trust_remote_code=model_args.trust_remote_code,
-        **model_kwargs,
-    )
+    if 'DPO' not in checkpoint_path:
+        base_model_name = model_args.model_name_or_path  # Use the base model path for config
+        
+        # Load config from base model first
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(
+            base_model_name,
+            trust_remote_code=model_args.trust_remote_code,
+        )
+        # remove the prefix 'policy.' from the keys to load the model; skip the critic and value model
+        model = AutoModelForCausalLM.from_pretrained(
+            checkpoint_path,
+            config=config,
+            trust_remote_code=model_args.trust_remote_code,
+            **model_kwargs,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            checkpoint_path,
+            trust_remote_code=model_args.trust_remote_code,
+            local_files_only=True,
+            **model_kwargs,
+        )
     peft_config = get_peft_config(model_args)
 
     ref_model = AutoModelForCausalLM.from_pretrained(
@@ -92,12 +115,12 @@ def main(
     output_dir = training_args.output_dir
 
     # Validate reward model paths if provided
-    for i, _ in enumerate(continual_dataset):
-        reward_path = training_args.reward_model_path + '_' + str(i)
-        if not os.path.exists(reward_path):
-            raise FileNotFoundError(
-                f'Reward model not found for dataset {i} at {reward_path}'
-            )
+    # for i, _ in enumerate(continual_dataset):
+    #     reward_path = training_args.reward_model_path + '_' + str(i)
+    #     if not os.path.exists(reward_path):
+    #         raise FileNotFoundError(
+    #             f'Reward model not found for dataset {i} at {reward_path}'
+    #         )
 
     # Task Loop
     for i, dataset in enumerate(continual_dataset):

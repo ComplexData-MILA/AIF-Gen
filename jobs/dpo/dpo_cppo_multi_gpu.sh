@@ -18,20 +18,20 @@ dataset_name='CPPO-RL'
 
 accelerate launch --config_file benchmarks/dpo/accelerate_configs/deepspeed_zero3.yaml \
     benchmarks/dpo/dpo_continual.py \
-    --dataset_name 'CPPO-RL' \
+    --dataset_name $dataset_name \
     --model_name_or_path Qwen/Qwen2-0.5B-Instruct \
     --reward_model_path LifelongAlignment/Qwen2.5-0.5B-Instruct_CPPO_REWARD \
-    --learning_rate 5.0e-6 \
+    --learning_rate 1.0e-6 \
     --num_train_epochs 4 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 16 \
     --gradient_checkpointing \
-    --logging_steps 20 \
+    --logging_steps 10 \
     --eval_strategy steps \
     --response_length 256 \
-    --eval_steps 500 \
-    --save_steps 500 \
+    --eval_steps 50000 \
+    --save_steps 300 \
     --bf16 \
     --output_dir "$SCRATCH/projects/Qwen2-0.5B-DPO-${dataset_name}" \
     --no_remove_unused_columns \
-    --wandb_project $dataset_name   \
+    --wandb_project "$dataset_name-post-May-19"  \
     --wandb_run_name "Qwen2-0.5B-DPO-${dataset_name}-multi-gpu"

@@ -30,7 +30,7 @@ accelerate launch --config_file benchmarks/cppo/accelerate_configs/deepspeed_zer
     --response_length 256 \
     --num_train_epochs 4 \
     --gradient_checkpointing \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 4 \
     --logging_steps 10 \
     --eval_strategy steps \
     --eval_steps 200 \
