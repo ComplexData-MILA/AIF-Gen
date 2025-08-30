@@ -311,8 +311,8 @@ class ContinualPPOTrainer(PPOTrainer):
         # Training scheduling
         args.num_total_batches = math.ceil(args.total_episodes / args.batch_size)
         time_tensor = torch.tensor(int(time.time()), device=self.accelerator.device)
-        time_int = broadcast(time_tensor, 0).item()
-        args.run_name = f'{args.exp_name}__{args.seed}__{time_int}'
+        broadcast(time_tensor, 0).item()
+        # args.run_name = f'{args.exp_name}__{args.seed}__{time_int}'
         self.local_seed = args.seed + self.accelerator.process_index * 100003  # Prime
         if args.num_sample_generations > 0:
             self.sample_generations_freq = max(
@@ -729,110 +729,110 @@ class ContinualPPOTrainer(PPOTrainer):
                     for micro_batch_start in range(
                         0, args.local_mini_batch_size, args.per_device_train_batch_size
                     ):
-                        with accelerator.accumulate(model):
-                            micro_batch_end = (
-                                micro_batch_start + args.per_device_train_batch_size
-                            )
-                            micro_batch_inds = mini_batch_inds[
-                                micro_batch_start:micro_batch_end
-                            ]
-                            mb_advantage = advantages[micro_batch_inds]
-                            mb_responses = responses[micro_batch_inds]
-                            mb_query_responses = query_responses[micro_batch_inds]
-                            mb_logprobs = logprobs[micro_batch_inds]
-                            mb_return = returns[micro_batch_inds]
-                            mb_values = values[micro_batch_inds]
+                        # with accelerator.accumulate(model):
+                        micro_batch_end = (
+                            micro_batch_start + args.per_device_train_batch_size
+                        )
+                        micro_batch_inds = mini_batch_inds[
+                            micro_batch_start:micro_batch_end
+                        ]
+                        mb_advantage = advantages[micro_batch_inds]
+                        mb_responses = responses[micro_batch_inds]
+                        mb_query_responses = query_responses[micro_batch_inds]
+                        mb_logprobs = logprobs[micro_batch_inds]
+                        mb_return = returns[micro_batch_inds]
+                        mb_values = values[micro_batch_inds]
 
-                            output, vpred_temp = forward(
-                                model, mb_query_responses, processing_class.pad_token_id
+                        output, vpred_temp = forward(
+                            model, mb_query_responses, processing_class.pad_token_id
+                        )
+                        logits = output.logits[:, context_length - 1 : -1]
+                        logits /= args.temperature + 1e-7
+                        new_logprobs = selective_log_softmax(logits, mb_responses)
+                        new_logprobs = torch.masked_fill(
+                            new_logprobs,
+                            padding_mask[micro_batch_inds],
+                            INVALID_LOGPROB,
+                        )
+                        vpred = vpred_temp[:, context_length - 1 : -1].squeeze(-1)
+                        vpred = torch.masked_fill(
+                            vpred, padding_mask_p1[micro_batch_inds], 0
+                        )
+                        vpredclipped = torch.clamp(
+                            vpred,
+                            mb_values - args.cliprange_value,
+                            mb_values + args.cliprange_value,
+                        )
+                        vf_losses1 = torch.square(vpred - mb_return)
+                        vf_losses2 = torch.square(vpredclipped - mb_return)
+                        vf_loss_max = torch.max(vf_losses1, vf_losses2)
+                        vf_loss = 0.5 * masked_mean(
+                            vf_loss_max, ~padding_mask_p1[micro_batch_inds]
+                        )
+                        vf_clipfrac = masked_mean(
+                            (vf_losses2 > vf_losses1).float(),
+                            ~padding_mask_p1[micro_batch_inds],
+                        )
+                        logprobs_diff = new_logprobs - mb_logprobs
+                        ratio = torch.exp(logprobs_diff)
+                        pg_losses = -mb_advantage * ratio
+                        pg_losses2 = -mb_advantage * torch.clamp(
+                            ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
+                        )
+                        pg_loss_max = torch.max(pg_losses, pg_losses2)
+                        pg_loss = masked_mean(
+                            pg_loss_max, ~padding_mask[micro_batch_inds]
+                        )
+                        loss = pg_loss + args.vf_coef * vf_loss
+                        accelerator.backward(loss)
+                        optimizer.step()
+                        optimizer.zero_grad()
+                        with torch.no_grad():
+                            pg_clipfrac = masked_mean(
+                                (pg_losses2 > pg_losses).float(),
+                                ~padding_mask[micro_batch_inds],
                             )
-                            logits = output.logits[:, context_length - 1 : -1]
-                            logits /= args.temperature + 1e-7
-                            new_logprobs = selective_log_softmax(logits, mb_responses)
-                            new_logprobs = torch.masked_fill(
-                                new_logprobs,
-                                padding_mask[micro_batch_inds],
-                                INVALID_LOGPROB,
+                            prob_dist = torch.nn.functional.softmax(logits, dim=-1)
+                            entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
+                                prob_dist * logits, dim=-1
                             )
-                            vpred = vpred_temp[:, context_length - 1 : -1].squeeze(-1)
-                            vpred = torch.masked_fill(
-                                vpred, padding_mask_p1[micro_batch_inds], 0
-                            )
-                            vpredclipped = torch.clamp(
-                                vpred,
-                                mb_values - args.cliprange_value,
-                                mb_values + args.cliprange_value,
-                            )
-                            vf_losses1 = torch.square(vpred - mb_return)
-                            vf_losses2 = torch.square(vpredclipped - mb_return)
-                            vf_loss_max = torch.max(vf_losses1, vf_losses2)
-                            vf_loss = 0.5 * masked_mean(
-                                vf_loss_max, ~padding_mask_p1[micro_batch_inds]
-                            )
-                            vf_clipfrac = masked_mean(
-                                (vf_losses2 > vf_losses1).float(),
-                                ~padding_mask_p1[micro_batch_inds],
-                            )
-                            logprobs_diff = new_logprobs - mb_logprobs
-                            ratio = torch.exp(logprobs_diff)
-                            pg_losses = -mb_advantage * ratio
-                            pg_losses2 = -mb_advantage * torch.clamp(
-                                ratio, 1.0 - args.cliprange, 1.0 + args.cliprange
-                            )
-                            pg_loss_max = torch.max(pg_losses, pg_losses2)
-                            pg_loss = masked_mean(
-                                pg_loss_max, ~padding_mask[micro_batch_inds]
-                            )
-                            loss = pg_loss + args.vf_coef * vf_loss
-                            accelerator.backward(loss)
-                            optimizer.step()
-                            optimizer.zero_grad()
-                            with torch.no_grad():
-                                pg_clipfrac = masked_mean(
-                                    (pg_losses2 > pg_losses).float(),
-                                    ~padding_mask[micro_batch_inds],
-                                )
-                                prob_dist = torch.nn.functional.softmax(logits, dim=-1)
-                                entropy = torch.logsumexp(logits, dim=-1) - torch.sum(
-                                    prob_dist * logits, dim=-1
-                                )
-                                approxkl = 0.5 * (logprobs_diff**2).mean()
-                                approxkl_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = approxkl
-                                pg_clipfrac_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = pg_clipfrac
-                                pg_loss_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = pg_loss
-                                vf_loss_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = vf_loss
-                                vf_clipfrac_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = vf_clipfrac
-                                entropy_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = entropy.mean()
-                                ratio_stats[
-                                    ppo_epoch_idx,
-                                    minibatch_idx,
-                                    gradient_accumulation_idx,
-                                ] = ratio.mean()
-                        gradient_accumulation_idx += 1
+                            approxkl = 0.5 * (logprobs_diff**2).mean()
+                            approxkl_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = approxkl
+                            pg_clipfrac_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = pg_clipfrac
+                            pg_loss_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = pg_loss
+                            vf_loss_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = vf_loss
+                            vf_clipfrac_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = vf_clipfrac
+                            entropy_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = entropy.mean()
+                            ratio_stats[
+                                ppo_epoch_idx,
+                                minibatch_idx,
+                                gradient_accumulation_idx,
+                            ] = ratio.mean()
+                    gradient_accumulation_idx += 1
                     minibatch_idx += 1
                     # del everything and empty cache
                     # fmt: off

@@ -3,6 +3,7 @@
 import os
 
 import torch
+import wandb as wb
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -18,7 +19,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 from benchmarks.ppo_ewc.continual_ppo_EWC_trainer import (
     ContinualPPOEWCArguments,
@@ -176,8 +176,9 @@ def main(
             trainer.save_metrics('eval', metrics)
 
             # Log metrics to WandB
-            wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
-            wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
+            if training_args.local_rank in (None, -1, 0):
+                wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
+                wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
 
         # Save model checkpoint and optionally push
         if not training_args.push_to_hub:

@@ -23,6 +23,10 @@ dependencies = [
     "numpy>=2.0.2",
     "openai>=1.61.1",
     "pydantic>=2.10.4",
+    "pytest-asyncio>=0.25.3",
+    "pytest-mock>=3.14.0",
+#    "torch @ https://download.pytorch.org/whl/rocm6.0/torch-2.3.0%2Brocm6.0-cp310-cp310-linux_x86_64.whl#sha256=266af54cf4704aae08719305c205f0d12f40874006d3b8058f38e2f8ed08f56d",
+    "types-pyyaml>=6.0.12.20241230",
     "torch>=2.6.0",
 ]
 

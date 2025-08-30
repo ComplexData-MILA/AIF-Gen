@@ -3,11 +3,7 @@
 import os
 
 import torch
-from continual_dpo_trainer import (
-    ContinualDPOArguments,
-    ContinualDPOConfig,
-    ContinualDPOTrainer,
-)
+import wandb as wb
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -23,7 +19,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 from benchmarks.dpo.continual_dpo_trainer import (
     ContinualDPOArguments,
@@ -104,7 +99,7 @@ def main(
             # first check the hub if the model is present
             try:
                 AutoModelForSequenceClassification.from_pretrained(
-                    reward_path, num_labels=1
+                    reward_path, num_labels=1, use_cache=True
                 )
             except:
                 # if not found in the hub, check the local path
@@ -137,6 +132,9 @@ def main(
             peft_config=peft_config,
         )
 
+        # if i == 0:
+        #     trainer.save_model(os.path.join(training_args.output_dir, 'checkpoint-0'))
+
         # TODO will throw Invalidate trace cache @ step 10: expected module 11, but got module 19
         # https://github.com/deepspeedai/DeepSpeed/issues/6870
         # Fix with deepspeed fix release
@@ -152,8 +150,9 @@ def main(
             print(f'eval/dataset/{i}')
             trainer.log_metrics(f'eval/dataset/{i}', metrics)
             trainer.save_metrics(f'eval', metrics)
-            wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
-            wb.log({f'task/{current_dataset_name}/last': metrics})  # type: ignore[attr-defined]
+            if training_args.local_rank in (None, -1, 0):
+                wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
+                wb.log({f'task/{current_dataset_name}/last': metrics})  # type: ignore[attr-defined]
 
         # Save and push to hub
         trainer.save_model(os.path.join(training_args.output_dir, 'last'))

@@ -3,6 +3,7 @@
 import os
 
 import torch
+import wandb as wb
 from continual_ppo_trainer import (
     ContinualPPOArguments,
     ContinualPPOConfig,
@@ -23,7 +24,6 @@ from trl import (
 )
 from trl.trainer.utils import SIMPLE_CHAT_TEMPLATE
 
-import wandb as wb
 from benchmarks.dataloading import init_continual_dataset
 
 
@@ -100,6 +100,7 @@ def main(
     if '.' in clean_dataset_name:
         clean_dataset_name = clean_dataset_name.split('.')[0]
 
+    print(f'Training PPO on {len(continual_dataset)} tasks')
     # check if the reward models are present either in the path or in the hub
     if training_args.reward_model_path is not None:
         for i in range(len(continual_dataset)):
@@ -143,6 +144,10 @@ def main(
             eval_dataset=dataset[script_args.dataset_test_split],
             peft_config=peft_config,
         )
+
+        # if i == 0:
+        #     trainer.save_model(os.path.join(training_args.output_dir, 'checkpoint-0'))
+
         # Set current task in trainer for task-based logging
         trainer.set_task(f'task_{i}')
 
@@ -164,8 +169,9 @@ def main(
             trainer.save_metrics('eval', metrics)
 
             # Log metrics to WandB
-            wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
-            wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
+            if training_args.local_rank in (None, -1, 0):
+                wb.log({'eval': {'last': metrics}})  # type: ignore[attr-defined]
+                wb.log({f'task/{custom_repo_name}/last': metrics})  # type: ignore[attr-defined]
 
         # Save model checkpoint and optionally push
         if not training_args.push_to_hub:
