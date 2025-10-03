@@ -17,7 +17,7 @@ We'll need to serve our model on an inference server with vLLM. The following wi
 uv tool install vllm
 
 # Serve the model locally
-uvx --with setuptools serve allenai/OLMo-1B-hf --dtype auto --api-key MY_KEY --chat-template chat_templates/omlo-chat-template.jinja
+uvx --with setuptools vllm serve allenai/OLMo-1B-hf --dtype auto --api-key MY_KEY --chat-template chat_templates/olmo-chat-template.jinja
 ```
 
 Some things to keep in mind:
