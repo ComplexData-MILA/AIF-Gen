@@ -64,7 +64,7 @@ class ResponseMapper(ResponseMapperBase):
             prompt = f"""\
             Generate a response to the following prompt: '{task_prompt}'.
             {desc_pos}{desc_neg} and
-            {self._preference_axes_scale(scores)}'
+            {self._preference_axes_scale(scores, 1, 5)}'
             You don't need to start your response by saying "here is the response" nor to give any meta-explanation. Just provide the response.
             """
             if self.suffix_context:
