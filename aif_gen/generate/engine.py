@@ -18,6 +18,7 @@ from aif_gen.dataset import (
 )
 from aif_gen.generate.caching import AsyncElasticsearchCache
 from aif_gen.generate.mappers import PromptMapper, ResponseMapper
+from aif_gen.generate.mappers.pair_selector import ScoredCandidate, select_pair
 from aif_gen.task.alignment_task import AlignmentTask
 
 
@@ -31,6 +32,7 @@ async def generate_continual_dataset(
     dry_run: bool = False,
     include_preference_axes: bool = False,
     temperature: float = 1.0,
+    generation_config: Optional[Dict[str, Any]] = None,
 ) -> Optional[ContinualAlignmentDataset]:
     r"""Generate a ContinualAlignmentDataset dataset given the AlignmentTask, and model.
 
@@ -44,6 +46,13 @@ async def generate_continual_dataset(
         dry_run (bool): If True, ignore the config and generate a dummy sample to ensure the model is setup correctly.
         include_preference_axes (bool): If True, include the preference axes in the prompt for response mapper.
         temperature (float): Temperature for the model.
+        generation_config (Optional[Dict[str, Any]]): Optional dict enabling the
+            Sample-N → Score → Select pipeline (RLCD + HelpSteer2 + West-of-N).
+            When provided, overrides the legacy joint-generation path. Recognized
+            keys: ``n_candidates`` (int), ``target_margin`` (float in [0, 1]),
+            ``min_margin`` (float), ``max_margin`` (Optional[float]),
+            ``length_ratio_band`` ([float, float]), ``rubric_weights`` (dict),
+            ``persona_schedule`` (Optional[List[(str, float)]]).
 
     Returns:
         Optional[ContinualAlignmentDataset]: The synthetically generated dataset.
@@ -51,25 +60,50 @@ async def generate_continual_dataset(
     prompt_mapper = PromptMapper()
     response_mapper = ResponseMapper()
     task_specs = data_config['task_specs']
+    use_sampled_pipeline = generation_config is not None
+    if use_sampled_pipeline:
+        assert generation_config is not None  # for type narrowing
+        logging.info(
+            f'Using Sample-N → Score → Select generation pipeline: {generation_config}'
+        )
 
     if dry_run:
         logging.info(f'Doing dry-run data generation on a single sample...')
         mock_task = AlignmentTask.from_dict(task_specs[0]['alignment_task'])
-        coro = _generate_sample(
-            mock_task,
-            client,
-            model_name,
-            prompt_mapper,
-            response_mapper,
-            async_semaphore,
-            max_tokens_prompt_response,
-            max_tokens_chosen_rejected_response,
-            dataset_idx=-1,
-            prompt_idx=-1,
-            cache=None,
-            include_preference_axes=include_preference_axes,
-            temperature=temperature,
-        )
+        if use_sampled_pipeline:
+            assert generation_config is not None
+            coro = _generate_sample_sampled(
+                mock_task,
+                client,
+                model_name,
+                prompt_mapper,
+                response_mapper,
+                async_semaphore,
+                max_tokens_prompt_response,
+                max_tokens_chosen_rejected_response,
+                dataset_idx=-1,
+                prompt_idx=-1,
+                cache=None,
+                judge_cache=None,
+                generation_config=generation_config,
+                temperature=temperature,
+            )
+        else:
+            coro = _generate_sample(
+                mock_task,
+                client,
+                model_name,
+                prompt_mapper,
+                response_mapper,
+                async_semaphore,
+                max_tokens_prompt_response,
+                max_tokens_chosen_rejected_response,
+                dataset_idx=-1,
+                prompt_idx=-1,
+                cache=None,
+                include_preference_axes=include_preference_axes,
+                temperature=temperature,
+            )
         try:
             _ = await coro
         except BaseException as e:
@@ -81,6 +115,11 @@ async def generate_continual_dataset(
     cache = await AsyncElasticsearchCache.maybe_from_env_var(
         index_name=f'CACHE_DATA_GENERATION_{model_name}'
     )
+    judge_cache = None
+    if use_sampled_pipeline:
+        judge_cache = await AsyncElasticsearchCache.maybe_from_env_var(
+            index_name=f'CACHE_DATA_GENERATION_RUBRIC_{model_name}'
+        )
     futures, tasks, dataset_sizes = [], [], []
     for dataset_idx, task_spec in enumerate(task_specs):
         task = AlignmentTask.from_dict(task_spec['alignment_task'])
@@ -90,21 +129,40 @@ async def generate_continual_dataset(
         tasks.append(task)
         dataset_sizes.append(dataset_size)
         for _sample_idx in range(dataset_size):
-            coro = _generate_sample(
-                task,
-                client,
-                model_name,
-                prompt_mapper,
-                response_mapper,
-                async_semaphore,
-                max_tokens_prompt_response,
-                max_tokens_chosen_rejected_response,
-                dataset_idx=dataset_idx,
-                prompt_idx=_sample_idx,
-                cache=cache,
-                include_preference_axes=include_preference_axes,
-                temperature=temperature,
-            )
+            if use_sampled_pipeline:
+                assert generation_config is not None
+                coro = _generate_sample_sampled(
+                    task,
+                    client,
+                    model_name,
+                    prompt_mapper,
+                    response_mapper,
+                    async_semaphore,
+                    max_tokens_prompt_response,
+                    max_tokens_chosen_rejected_response,
+                    dataset_idx=dataset_idx,
+                    prompt_idx=_sample_idx,
+                    cache=cache,
+                    judge_cache=judge_cache,
+                    generation_config=generation_config,
+                    temperature=temperature,
+                )
+            else:
+                coro = _generate_sample(
+                    task,
+                    client,
+                    model_name,
+                    prompt_mapper,
+                    response_mapper,
+                    async_semaphore,
+                    max_tokens_prompt_response,
+                    max_tokens_chosen_rejected_response,
+                    dataset_idx=dataset_idx,
+                    prompt_idx=_sample_idx,
+                    cache=cache,
+                    include_preference_axes=include_preference_axes,
+                    temperature=temperature,
+                )
             futures.append(asyncio.create_task(coro))
 
     try:
@@ -125,8 +183,9 @@ async def generate_continual_dataset(
                 )
             continual_dataset.append(AlignmentDataset(tasks[i], samples[i]))
 
-        # If preference axes included, use judge to pick chosen/rejected responses
-        if include_preference_axes:
+        # If preference axes included, use judge to pick chosen/rejected responses.
+        # Skipped under the sampled pipeline, which already orders the pair by rubric score.
+        if include_preference_axes and not use_sampled_pipeline:
             from aif_gen.validation.llm_judge import (
                 _get_judge_prompt,
                 _get_score,
@@ -221,6 +280,8 @@ async def generate_continual_dataset(
     finally:
         if cache is not None:
             await cache.close()
+        if judge_cache is not None:
+            await judge_cache.close()
 
 
 @lru_cache(maxsize=None)
@@ -384,6 +445,213 @@ async def _generate_sample(
         )
         logging.debug(f'Task Prompt: {task_prompt}, Sample: {sample}')
         return sample, dataset_idx
+    except pydantic.ValidationError as e:
+        logging.error(f'Failed to bind structured output json schema: {e}')
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Sample-N → Score → Select pipeline (RLCD + HelpSteer2 + West-of-N)
+# ---------------------------------------------------------------------------
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
+    max_tries=_get_tries(),
+)
+async def _generate_sample_sampled(
+    task: AlignmentTask,
+    client: openai.AsyncOpenAI,
+    model_name: str,
+    prompt_mapper: PromptMapper,
+    response_mapper: ResponseMapper,
+    async_semaphore: asyncio.Semaphore,
+    max_tokens_prompt_response: int,
+    max_tokens_chosen_rejected_response: int,
+    dataset_idx: int,
+    prompt_idx: int,
+    generation_config: Optional[Dict[str, Any]],
+    cache: 'AsyncElasticsearchCache | None' = None,
+    judge_cache: 'AsyncElasticsearchCache | None' = None,
+    temperature: float = 1.0,
+) -> Optional[Tuple[AlignmentDatasetSample, int]]:
+    r"""Generate one sample via Sample-N → Score → Select.
+
+    1. Generate the task prompt (same as legacy).
+    2. Sample N candidate responses with varied (persona, temperature).
+    3. Score each candidate with the rubric judge (HelpSteer2-style).
+    4. Select a (chosen, rejected) pair whose score gap matches `target_margin`.
+    """
+    # Local import to avoid circular import at module load time.
+    from aif_gen.validation.llm_judge import (
+        _get_rubric_judge_prompt,
+        _get_rubric_score,
+    )
+
+    if generation_config is None:
+        generation_config = {}
+    n_candidates = int(generation_config.get('n_candidates', 6))
+    target_margin = float(generation_config.get('target_margin', 0.6))
+    min_margin = float(generation_config.get('min_margin', 0.3))
+    raw_max_margin = generation_config.get('max_margin', None)
+    max_margin = float(raw_max_margin) if raw_max_margin is not None else None
+    length_band_raw = generation_config.get('length_ratio_band', [0.5, 2.0])
+    length_ratio_band = (float(length_band_raw[0]), float(length_band_raw[1]))
+    rubric_weights = generation_config.get('rubric_weights', None)
+    persona_schedule = generation_config.get('persona_schedule', None)
+    if persona_schedule is None:
+        persona_schedule = response_mapper.default_persona_schedule(
+            n_candidates, base_temperature=temperature
+        )
+    else:
+        persona_schedule = [(str(p), float(t)) for p, t in persona_schedule]
+        if len(persona_schedule) != n_candidates:
+            raise ValueError(
+                f'persona_schedule length ({len(persona_schedule)}) must equal '
+                f'n_candidates ({n_candidates})'
+            )
+
+    try:
+        # ---- 1. Generate the task prompt (cached, same as legacy) ----
+        meta_prompt = prompt_mapper.generate_prompt(task)
+        meta_prompt_nonce = f'{prompt_idx}'
+
+        async with async_semaphore:
+            output = None
+            if cache is not None:
+                output = await cache.get(meta_prompt, nonce=meta_prompt_nonce)
+            if output is None:
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    messages=[{'role': 'user', 'content': meta_prompt}],
+                    max_tokens=max_tokens_prompt_response,
+                    response_format={
+                        'type': 'json_schema',
+                        'json_schema': {
+                            'name': 'PromptProposal',
+                            'schema': _PromptProposal.model_json_schema(),
+                            'strict': True,
+                        },
+                    },
+                    temperature=temperature,
+                )
+                output = response.choices[0].message.content
+
+        if output is None:
+            raise ValueError(f'Received None response to meta prompt: {meta_prompt}')
+        prompt = _PromptProposal.model_validate_json(output).prompt
+        if cache is not None:
+            await cache.set(query=meta_prompt, value=output, nonce=meta_prompt_nonce)
+
+        # ---- 2. Sample N candidate responses in parallel ----
+        async def _one_candidate(
+            persona: str, t: float, cand_idx: int
+        ) -> Optional[str]:
+            cand_prompt = response_mapper.generate_candidate_prompt(
+                task, prompt, persona
+            )
+            cand_nonce = f'{prompt_idx}:cand:{cand_idx}:{persona}:{t:.3f}'
+            async with async_semaphore:
+                cand_output = None
+                if cache is not None:
+                    cand_output = await cache.get(cand_prompt, nonce=cand_nonce)
+                if cand_output is None:
+                    resp = await client.chat.completions.create(
+                        model=model_name,
+                        messages=[{'role': 'user', 'content': cand_prompt}],
+                        max_tokens=max_tokens_chosen_rejected_response,
+                        response_format={
+                            'type': 'json_schema',
+                            'json_schema': {
+                                'name': 'CandidateResponse',
+                                'schema': _Response.model_json_schema(),
+                                'strict': True,
+                            },
+                        },
+                        temperature=t,
+                    )
+                    cand_output = resp.choices[0].message.content
+            if cand_output is None:
+                return None
+            try:
+                parsed = _Response.model_validate_json(cand_output)
+            except pydantic.ValidationError as e:
+                logging.warning(f'Candidate {cand_idx} schema parse failed: {e}')
+                return None
+            if cache is not None:
+                await cache.set(query=cand_prompt, value=cand_output, nonce=cand_nonce)
+            return parsed.response
+
+        cand_coros = [
+            _one_candidate(persona, t, i)
+            for i, (persona, t) in enumerate(persona_schedule)
+        ]
+        cand_texts = await asyncio.gather(*cand_coros, return_exceptions=False)
+
+        # ---- 3. Score each successful candidate with the rubric judge ----
+        async def _score_one(text: Optional[str]) -> Optional[float]:
+            if text is None:
+                return None
+            judge_prompt = _get_rubric_judge_prompt(
+                prompt=prompt,
+                response=text,
+                preference=task.preference,
+                objective=task.objective,
+            )
+            return await _get_rubric_score(
+                judge_prompt,
+                client,
+                model_name,
+                async_semaphore,
+                max_tokens_judge_response=64,
+                cache=judge_cache,
+                weights=rubric_weights,
+            )
+
+        score_coros = [_score_one(t) for t in cand_texts]
+        scores = await asyncio.gather(*score_coros, return_exceptions=False)
+
+        scored: List[ScoredCandidate] = []
+        for (persona, _t), text, score in zip(persona_schedule, cand_texts, scores):
+            if text is None or score is None:
+                continue
+            scored.append(ScoredCandidate(text=text, score=score, persona=persona))
+
+        if len(scored) < 2:
+            logging.warning(
+                f'Only {len(scored)}/{n_candidates} usable candidates for prompt_idx={prompt_idx}; dropping sample.'
+            )
+            return None
+
+        # ---- 4. Select pair by margin ----
+        pair = select_pair(
+            scored,
+            target_margin=target_margin,
+            min_margin=min_margin,
+            max_margin=max_margin,
+            length_ratio_band=length_ratio_band,
+        )
+        if pair is None:
+            logging.info(
+                f'No admissible pair for prompt_idx={prompt_idx} '
+                f'(target_margin={target_margin}, min_margin={min_margin}); dropping sample.'
+            )
+            return None
+
+        chosen_cand, rejected_cand = pair
+        sample = AlignmentDatasetSample(
+            prompt=prompt,
+            chosen=chosen_cand.text,
+            rejected=rejected_cand.text,
+        )
+        logging.debug(
+            f'Sampled pipeline: prompt_idx={prompt_idx} '
+            f'chosen_score={chosen_cand.score:.2f} ({chosen_cand.persona}) '
+            f'rejected_score={rejected_cand.score:.2f} ({rejected_cand.persona})'
+        )
+        return sample, dataset_idx
+
     except pydantic.ValidationError as e:
         logging.error(f'Failed to bind structured output json schema: {e}')
         return None
