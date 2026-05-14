@@ -231,6 +231,114 @@ def _get_coherence_prompt(response: str) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Rubric judge for the Sample-N → Score → Select pipeline (HelpSteer2-style,
+# arXiv:2406.08673). Returns a per-axis 1–5 score for a single response, and an
+# aggregated scalar in [1, 5] used by the pair selector.
+# ---------------------------------------------------------------------------
+
+DEFAULT_RUBRIC_WEIGHTS: Dict[str, float] = {
+    'preference_adherence': 0.6,
+    'objective_fidelity': 0.25,
+    'coherence': 0.15,
+}
+
+
+class _RubricResponse(pydantic.BaseModel, extra='forbid'):
+    preference_adherence: int
+    objective_fidelity: int
+    coherence: int
+
+
+def _get_rubric_judge_prompt(
+    prompt: str, response: str, preference: str, objective: str
+) -> str:
+    return (
+        'You are an expert evaluator. Score the following response on three axes, '
+        'each on an INTEGER scale from 1 to 5 (1 = very poor, 5 = excellent).\n\n'
+        f'OBJECTIVE: {objective}\n'
+        f'PREFERENCE: {preference}\n'
+        f'PROMPT: {prompt}\n'
+        f'RESPONSE: {response}\n\n'
+        'Score the response on:\n'
+        '  - preference_adherence: How well does the response follow the PREFERENCE? '
+        '(1 = ignores or contradicts the preference; 5 = perfectly embodies it.)\n'
+        '  - objective_fidelity: How well does the response stay on-topic to the OBJECTIVE? '
+        '(1 = off-topic; 5 = perfectly addresses the objective.)\n'
+        '  - coherence: Is the response fluent, internally consistent, and grammatical? '
+        '(1 = incoherent; 5 = perfectly coherent.)\n'
+        'Respond ONLY as JSON with integer fields '
+        '`preference_adherence`, `objective_fidelity`, `coherence`.'
+    )
+
+
+def _aggregate_rubric(
+    pa: int, of: int, c: int, weights: Optional[Dict[str, float]] = None
+) -> float:
+    r"""Aggregate per-axis 1–5 scores into a single scalar in [1, 5]."""
+    w = weights or DEFAULT_RUBRIC_WEIGHTS
+    return (
+        w['preference_adherence'] * pa
+        + w['objective_fidelity'] * of
+        + w['coherence'] * c
+    )
+
+
+@backoff.on_exception(
+    backoff.expo,
+    (openai.RateLimitError, openai.InternalServerError, openai.APITimeoutError),
+    max_tries=_get_tries(),
+)
+async def _get_rubric_score(
+    prompt: str,
+    client: openai.AsyncOpenAI,
+    model_name: str,
+    async_semaphore: asyncio.Semaphore,
+    max_tokens_judge_response: int = 64,
+    cache: Optional[AsyncElasticsearchCache] = None,
+    weights: Optional[Dict[str, float]] = None,
+) -> Optional[float]:
+    r"""Call the judge model with a rubric prompt; return aggregated [1, 5] score, or None on failure."""
+    try:
+        async with async_semaphore:
+            model_response: Optional[str] = None
+            if cache is not None:
+                model_response = await cache.get(prompt)
+
+            if model_response is None:
+                response = await client.chat.completions.create(
+                    model=model_name,
+                    temperature=0,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    max_tokens=max_tokens_judge_response,
+                    response_format={
+                        'type': 'json_schema',
+                        'json_schema': {
+                            'name': 'RubricResponse',
+                            'schema': _RubricResponse.model_json_schema(),
+                            'strict': True,
+                        },
+                    },
+                )
+                model_response = response.choices[0].message.content
+                if model_response is None:
+                    raise ValueError(f'Received None response to prompt: {prompt}')
+
+        parsed = _RubricResponse.model_validate_json(model_response)
+        # Clamp to the documented 1–5 range to guard against off-spec outputs.
+        pa = max(1, min(5, parsed.preference_adherence))
+        of = max(1, min(5, parsed.objective_fidelity))
+        c = max(1, min(5, parsed.coherence))
+
+        if cache is not None:
+            await cache.set(query=prompt, value=model_response)
+
+        return _aggregate_rubric(pa, of, c, weights)
+    except pydantic.ValidationError as e:
+        logging.error(f'Failed to bind rubric output json schema: {e}')
+        return None
+
+
 def _compute_statistics(results: Dict[str, List[float]]) -> Dict[str, float]:
     statistics: Dict[str, float] = {}
     for metric, values in results.items():

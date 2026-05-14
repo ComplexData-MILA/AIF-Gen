@@ -1,10 +1,20 @@
 import random
 from textwrap import dedent
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 from aif_gen.task import AlignmentTask
 
 from .base import ResponseMapperBase
+
+# Personas used by the candidate-sampling pipeline (RLCD-style contrastive
+# prompting, arXiv:2307.12950). The single-model substitute for multi-model
+# fan-out: an `aligned` prompt encourages the preference, an `anti_aligned`
+# prompt encourages violating it (while staying on-topic), and a `neutral`
+# prompt omits the preference instruction entirely.
+PERSONA_ALIGNED = 'aligned'
+PERSONA_ANTI_ALIGNED = 'anti_aligned'
+PERSONA_NEUTRAL = 'neutral'
+VALID_PERSONAS = (PERSONA_ALIGNED, PERSONA_ANTI_ALIGNED, PERSONA_NEUTRAL)
 
 
 class ResponseMapper(ResponseMapperBase):
@@ -93,3 +103,93 @@ class ResponseMapper(ResponseMapperBase):
             desc += f'On a scale of {min_score} to {max_score} where {min_score} is {axis[0]} and {max_score} is {axis[1]}, your response should be: {scores[i]}\n'
         desc += 'Please ensure your responses aligns with the provided scores.'
         return desc
+
+    # ------------------------------------------------------------------
+    # New "Sample-N → Score → Select" pipeline (RLCD + West-of-N + HelpSteer2)
+    # ------------------------------------------------------------------
+    def generate_candidate_prompt(
+        self,
+        task: AlignmentTask,
+        task_prompt: str,
+        persona: str,
+    ) -> str:
+        r"""Generate a single-response prompt conditioned on a persona.
+
+        This is the RLCD-style contrastive prompting (arXiv:2307.12950): instead
+        of asking one model in one call to produce both chosen and rejected,
+        we sample N independent responses with opposing instructions. The
+        difference in the *prompts* is what produces meaningfully differentiated
+        outputs from a single base model.
+
+        Args:
+            task: AlignmentTask containing objective, preference, domain.
+            task_prompt: The prompt the response should answer.
+            persona: One of 'aligned', 'anti_aligned', 'neutral'.
+
+        Returns:
+            Prompt string for a single response generation call.
+        """
+        if persona not in VALID_PERSONAS:
+            raise ValueError(
+                f'persona must be one of {VALID_PERSONAS}, got {persona!r}'
+            )
+
+        if persona == PERSONA_ALIGNED:
+            preference_clause = (
+                f"You MUST strictly follow this preference in every aspect of your response: '{task.preference}'.\n"
+                'Make the preference clearly evident in style, tone, and content.\n'
+            )
+        elif persona == PERSONA_ANTI_ALIGNED:
+            preference_clause = (
+                f"You MUST deliberately violate this preference while still answering the prompt and staying on-topic: '{task.preference}'.\n"
+                'Do not adopt the preferred style/tone/content; produce something that clearly does not satisfy the preference.\n'
+            )
+        else:  # neutral
+            preference_clause = 'Answer the prompt naturally without considering any particular stylistic preference.\n'
+
+        prompt = f"""\
+        Generate a single response to the following prompt: '{task_prompt}'.
+        {preference_clause}You don't need to start your response by saying "here is the response" nor to give any meta-explanation. Just provide the response.
+        """
+        if self.suffix_context:
+            prompt += self.suffix_context
+        return dedent(prompt)
+
+    @staticmethod
+    def default_persona_schedule(
+        n_candidates: int, base_temperature: float = 1.0
+    ) -> List[Tuple[str, float]]:
+        r"""Default (persona, temperature) schedule for N candidate samples.
+
+        Mixes aligned / anti_aligned / neutral with low and high temperatures
+        so the pool spans a wide rubric-score range. Deterministic given N.
+
+        Args:
+            n_candidates: Number of candidates per prompt.
+            base_temperature: Center temperature; temperatures are jittered
+                around this value.
+
+        Returns:
+            List of (persona, temperature) of length n_candidates.
+        """
+        if n_candidates < 2:
+            raise ValueError(f'n_candidates must be >= 2, got {n_candidates}')
+
+        t_lo = max(0.1, base_temperature - 0.3)
+        t_hi = min(2.0, base_temperature + 0.2)
+        rotation = [
+            (PERSONA_ALIGNED, base_temperature),
+            (PERSONA_ANTI_ALIGNED, t_hi),
+            (PERSONA_NEUTRAL, base_temperature),
+            (PERSONA_ALIGNED, t_lo),
+            (PERSONA_ANTI_ALIGNED, base_temperature),
+            (PERSONA_NEUTRAL, t_hi),
+        ]
+        # Ensure we always have at least one aligned and one anti_aligned for
+        # well-defined contrast even at very small N.
+        schedule = [rotation[i % len(rotation)] for i in range(n_candidates)]
+        if not any(p == PERSONA_ALIGNED for p, _ in schedule):
+            schedule[0] = (PERSONA_ALIGNED, base_temperature)
+        if not any(p == PERSONA_ANTI_ALIGNED for p, _ in schedule):
+            schedule[-1] = (PERSONA_ANTI_ALIGNED, t_hi)
+        return schedule
