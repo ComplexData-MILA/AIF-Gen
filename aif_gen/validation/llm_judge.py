@@ -251,20 +251,19 @@ class _RubricResponse(pydantic.BaseModel, extra='forbid'):
 
 
 def _get_rubric_judge_prompt(
-    prompt: str, response: str, preference: str, objective: str
+    prompt: str, response: str, preference: str
 ) -> str:
     return (
         'You are an expert evaluator. Score the following response on three axes, '
         'each on an INTEGER scale from 1 to 5 (1 = very poor, 5 = excellent).\n\n'
-        f'OBJECTIVE: {objective}\n'
-        f'PREFERENCE: {preference}\n'
         f'PROMPT: {prompt}\n'
+        f'PREFERENCE: {preference}\n'
         f'RESPONSE: {response}\n\n'
         'Score the response on:\n'
         '  - preference_adherence: How well does the response follow the PREFERENCE? '
         '(1 = ignores or contradicts the preference; 5 = perfectly embodies it.)\n'
-        '  - objective_fidelity: How well does the response stay on-topic to the OBJECTIVE? '
-        '(1 = off-topic; 5 = perfectly addresses the objective.)\n'
+        '  - objective_fidelity: How well does the response stay on-topic to the PROMPT? '
+        '(1 = off-topic; 5 = perfectly addresses the prompt.)\n'
         '  - coherence: Is the response fluent, internally consistent, and grammatical? '
         '(1 = incoherent; 5 = perfectly coherent.)\n'
         'Respond ONLY as JSON with integer fields '

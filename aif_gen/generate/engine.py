@@ -596,8 +596,7 @@ async def _generate_sample_sampled(
             judge_prompt = _get_rubric_judge_prompt(
                 prompt=prompt,
                 response=text,
-                preference=task.preference,
-                objective=task.objective,
+                preference=task.preference
             )
             return await _get_rubric_score(
                 judge_prompt,
