@@ -647,7 +647,7 @@ async def _generate_sample_sampled(
         logging.debug(
             f'Sampled pipeline: prompt_idx={prompt_idx} '
             f'chosen_score={chosen_cand.score:.2f} ({chosen_cand.persona}) '
-            f'rejected_score={rejected_cand.score:.2f} ({rejected_cand.persona})'
+            f'rejected_score={rejected_cand.score:.2f} ({rejected_cand.persona}) '
             f'all_scores={[(s.persona, s.score) for s in scored]})'
         )
         return sample, dataset_idx
