@@ -255,17 +255,19 @@ def _get_rubric_judge_prompt(
 ) -> str:
     return (
         'You are an expert evaluator. Score the following response on three axes, '
-        'each on an INTEGER scale from 1 to 100 (1 = very poor, 100 = excellent).\n\n'
+        'each on an INTEGER scale from 1 to 10 (1 = very poor, 10 = excellent).\n\n'
         f'PROMPT: {prompt}\n'
         f'PREFERENCE: {preference}\n'
         f'RESPONSE: {response}\n\n'
         'Score the response on:\n'
         '  - preference_adherence: How well does the response follow the PREFERENCE? '
-        '(1 = contradicts the preference; 100 = perfectly embodies it.)\n'
+        '(1 = contradicts the preference; 5 = neutral, 10 = perfectly embodies it.)\n'
         '  - objective_fidelity: How well does the response stay on-topic to the PROMPT? '
-        '(1 = off-topic; 100 = perfectly addresses the prompt.)\n'
+        '(1 = off-topic; 10 = perfectly addresses the prompt.)\n'
         '  - coherence: Is the response fluent, internally consistent, and grammatical? '
-        '(1 = incoherent; 100 = perfectly coherent.)\n'
+        '(1 = incoherent; 10 = perfectly coherent.)\n'
+        'Your scores need not fall exactly on these guideline integers. If the response is '
+        'somewhere in between these criteria, then interpolate appropriately. '
         'Respond ONLY as JSON with integer fields '
         '`preference_adherence`, `objective_fidelity`, `coherence`.'
     )
@@ -274,7 +276,7 @@ def _get_rubric_judge_prompt(
 def _aggregate_rubric(
     pa: int, of: int, c: int, weights: Optional[Dict[str, float]] = None
 ) -> float:
-    r"""Aggregate per-axis 1–100 scores into a single scalar in [1, 100]."""
+    r"""Aggregate per-axis 1–10 scores into a single scalar in [1, 10]."""
     w = weights or DEFAULT_RUBRIC_WEIGHTS
     return (
         w['preference_adherence'] * pa
@@ -297,7 +299,7 @@ async def _get_rubric_score(
     cache: Optional[AsyncElasticsearchCache] = None,
     weights: Optional[Dict[str, float]] = None,
 ) -> Optional[float]:
-    r"""Call the judge model with a rubric prompt; return aggregated [1, 100] score, or None on failure."""
+    r"""Call the judge model with a rubric prompt; return aggregated [1, 10] score, or None on failure."""
     try:
         async with async_semaphore:
             model_response: Optional[str] = None
@@ -325,9 +327,9 @@ async def _get_rubric_score(
 
         parsed = _RubricResponse.model_validate_json(model_response)
         # Clamp to the documented 1–5 range to guard against off-spec outputs.
-        pa = max(1, min(100, parsed.preference_adherence))
-        of = max(1, min(100, parsed.objective_fidelity))
-        c = max(1, min(100, parsed.coherence))
+        pa = max(1, min(10, parsed.preference_adherence))
+        of = max(1, min(10, parsed.objective_fidelity))
+        c = max(1, min(10, parsed.coherence))
 
         if cache is not None:
             await cache.set(query=prompt, value=model_response)

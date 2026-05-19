@@ -493,7 +493,7 @@ async def _generate_sample_sampled(
         generation_config = {}
     n_candidates = int(generation_config.get('n_candidates', 6))
     target_margin = float(generation_config.get('target_margin', 0.6))
-    min_margin = float(generation_config.get('min_margin', 0.0))
+    min_margin = float(generation_config.get('min_margin', 0.001))
     raw_max_margin = generation_config.get('max_margin', None)
     max_margin = float(raw_max_margin) if raw_max_margin is not None else None
     length_band_raw = generation_config.get('length_ratio_band', [0.5, 2.0])
