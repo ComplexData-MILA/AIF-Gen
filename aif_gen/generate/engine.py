@@ -19,7 +19,6 @@ from aif_gen.dataset import (
 )
 from aif_gen.generate.caching import AsyncElasticsearchCache
 from aif_gen.generate.mappers import PromptMapper, ResponseMapper
-from aif_gen.generate.mappers.pair_selector import ScoredCandidate, select_pair
 from aif_gen.task.alignment_task import AlignmentTask
 
 
