@@ -6,15 +6,28 @@ from aif_gen.task import AlignmentTask
 
 from .base import ResponseMapperBase
 
-# Personas used by the candidate-sampling pipeline (RLCD-style contrastive
-# prompting, arXiv:2307.12950). The single-model substitute for multi-model
-# fan-out: an `aligned` prompt encourages the preference, an `anti_aligned`
-# prompt encourages violating it (while staying on-topic), and a `neutral`
-# prompt omits the preference instruction entirely.
+
 PERSONA_ALIGNED = 'aligned'
-PERSONA_ANTI_ALIGNED = 'anti_aligned'
+PERSONA_SEMI_ALIGNED = 'semi_aligned'
 PERSONA_NEUTRAL = 'neutral'
-VALID_PERSONAS = (PERSONA_ALIGNED, PERSONA_ANTI_ALIGNED, PERSONA_NEUTRAL)
+PERSONA_SEMI_ANTI_ALIGNED = 'semi_anti_aligned'
+PERSONA_ANTI_ALIGNED = 'anti_aligned'
+
+D1_PAIRS = [(PERSONA_ALIGNED, PERSONA_ANTI_ALIGNED)]
+
+D2_PAIRS = [(PERSONA_ALIGNED, PERSONA_SEMI_ANTI_ALIGNED),
+            (PERSONA_SEMI_ALIGNED, PERSONA_ANTI_ALIGNED)]
+
+D3_PAIRS = [(PERSONA_ALIGNED, PERSONA_NEUTRAL),
+            (PERSONA_SEMI_ALIGNED, PERSONA_SEMI_ANTI_ALIGNED),
+            (PERSONA_NEUTRAL, PERSONA_ANTI_ALIGNED)]
+
+D4_PAIRS = [(PERSONA_ALIGNED, PERSONA_SEMI_ALIGNED),
+            (PERSONA_SEMI_ALIGNED, PERSONA_NEUTRAL),
+            (PERSONA_NEUTRAL, PERSONA_SEMI_ANTI_ALIGNED),
+            (PERSONA_SEMI_ANTI_ALIGNED, PERSONA_ANTI_ALIGNED)]
+
+VALID_PERSONAS = (PERSONA_ALIGNED, PERSONA_SEMI_ALIGNED, PERSONA_NEUTRAL, PERSONA_SEMI_ANTI_ALIGNED, PERSONA_ANTI_ALIGNED)
 
 
 class ResponseMapper(ResponseMapperBase):
@@ -105,9 +118,9 @@ class ResponseMapper(ResponseMapperBase):
         return desc
 
     # ------------------------------------------------------------------
-    # New "Sample-N → Score → Select" pipeline (RLCD + West-of-N + HelpSteer2)
+    # difficulty pipeline functions
     # ------------------------------------------------------------------
-    def generate_candidate_prompt(
+    def generate_persona_prompt(
         self,
         task: AlignmentTask,
         task_prompt: str,
@@ -115,16 +128,10 @@ class ResponseMapper(ResponseMapperBase):
     ) -> str:
         r"""Generate a single-response prompt conditioned on a persona.
 
-        This is the RLCD-style contrastive prompting (arXiv:2307.12950): instead
-        of asking one model in one call to produce both chosen and rejected,
-        we sample N independent responses with opposing instructions. The
-        difference in the *prompts* is what produces meaningfully differentiated
-        outputs from a single base model.
-
         Args:
             task: AlignmentTask containing objective, preference, domain.
             task_prompt: The prompt the response should answer.
-            persona: One of 'aligned', 'anti_aligned', 'neutral'.
+            persona: One of 'aligned', 'semi_aligned', 'neutral', 'semi_anti_aligned', 'anti_aligned'.
 
         Returns:
             Prompt string for a single response generation call.
@@ -136,17 +143,28 @@ class ResponseMapper(ResponseMapperBase):
 
         if persona == PERSONA_ALIGNED:
             preference_clause = (
-                f"You MUST strictly follow this preference in every aspect of your response: '{task.preference}'.\n"
+                f"You must strictly follow this preference in every aspect of your response: '{task.preference}'.\n"
                 'Make the preference clearly evident in style, tone, and content.\n'
+            )
+        elif persona == PERSONA_SEMI_ALIGNED:
+            preference_clause = (
+                f"You must loosely follow this preference in your response: '{task.preference}'.\n"
+                'Do not make it super evident that you are following the preference, but still follow it somewhat.\n'
+            )
+        elif persona == PERSONA_NEUTRAL:
+            preference_clause = 'Answer the prompt naturally without considering any particular stylistic preference.\n'
+
+        elif persona == PERSONA_SEMI_ANTI_ALIGNED:
+            preference_clause = (
+                f"You must loosely violate this preference while still answering the prompt and staying on-topic: '{task.preference}'.\n"
+                'Do not make it super evident that you are violating the preference, but still violate it somewhat.\n'
             )
         elif persona == PERSONA_ANTI_ALIGNED:
             preference_clause = (
-                f"You MUST deliberately violate this preference while still answering the prompt and staying on-topic: '{task.preference}'.\n"
+                f"You must deliberately violate this preference while still answering the prompt and staying on-topic: '{task.preference}'.\n"
                 'Do not adopt the preferred style/tone/content; produce something that clearly does not satisfy the preference.\n'
             )
-        else:  # neutral
-            preference_clause = 'Answer the prompt naturally without considering any particular stylistic preference.\n'
-
+        
         prompt = f"""\
         Generate a single response to the following prompt: '{task_prompt}'.
         {preference_clause}You don't need to start your response by saying "here is the response" nor to give any meta-explanation. Just provide the response.
@@ -156,40 +174,16 @@ class ResponseMapper(ResponseMapperBase):
         return dedent(prompt)
 
     @staticmethod
-    def default_persona_schedule(
-        n_candidates: int, base_temperature: float = 1.0
-    ) -> List[Tuple[str, float]]:
-        r"""Default (persona, temperature) schedule for N candidate samples.
-
-        Mixes aligned / anti_aligned / neutral with low and high temperatures
-        so the pool spans a wide rubric-score range. Deterministic given N.
-
+    def get_persona_pair(
+        D: int
+    ) -> Tuple[str, str]:
+        r"""Randomly samples a valid persona pair for given difficulty D
         Args:
-            n_candidates: Number of candidates per prompt.
-            base_temperature: Center temperature; temperatures are jittered
-                around this value.
-
+            D: difficulty
         Returns:
-            List of (persona, temperature) of length n_candidates.
+            (chosen_persona, rejected_persona)
         """
-        if n_candidates < 2:
-            raise ValueError(f'n_candidates must be >= 2, got {n_candidates}')
-
-        t_lo = max(0.1, base_temperature - 0.3)
-        t_hi = min(2.0, base_temperature + 0.2)
-        rotation = [
-            (PERSONA_ALIGNED, base_temperature),
-            (PERSONA_ANTI_ALIGNED, t_hi),
-            (PERSONA_NEUTRAL, base_temperature),
-            (PERSONA_ALIGNED, t_lo),
-            (PERSONA_ANTI_ALIGNED, base_temperature),
-            (PERSONA_NEUTRAL, t_hi),
-        ]
-        # Ensure we always have at least one aligned and one anti_aligned for
-        # well-defined contrast even at very small N.
-        schedule = [rotation[i % len(rotation)] for i in range(n_candidates)]
-        if not any(p == PERSONA_ALIGNED for p, _ in schedule):
-            schedule[0] = (PERSONA_ALIGNED, base_temperature)
-        if not any(p == PERSONA_ANTI_ALIGNED for p, _ in schedule):
-            schedule[-1] = (PERSONA_ANTI_ALIGNED, t_hi)
-        return schedule
+        pair_lists = [D1_PAIRS, D2_PAIRS, D3_PAIRS, D4_PAIRS]
+        valid_pairs = pair_lists[D-1]
+        return random.choice(valid_pairs)
+        
