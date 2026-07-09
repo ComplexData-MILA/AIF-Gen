@@ -122,7 +122,7 @@ def _build_torch_profiler(training_args: ContinualDPOConfig):
     if not training_args.enable_profiling:
         return None
 
-    active_steps = max(1, int(training_args.profiling_steps))
+    active_steps = max(1, training_args.profiling_steps)
     os.makedirs(training_args.profile_output_dir, exist_ok=True)
 
     activities = [torch.profiler.ProfilerActivity.CPU]
@@ -220,7 +220,9 @@ def main(
     explicit_policy_eval = training_args.eval_policy_metrics or training_args.log_completions
 
     if training_args.eval_policy_metrics and training_args.reward_model_path is None:
-        raise ValueError('--eval_policy_metrics requires --reward_model_path.')
+        raise ValueError(
+            'Cannot use --eval_policy_metrics without --reward_model_path; reward model path must be specified for policy evaluation.'
+        )
 
     if explicit_policy_eval:
         validate_reward_model_paths(

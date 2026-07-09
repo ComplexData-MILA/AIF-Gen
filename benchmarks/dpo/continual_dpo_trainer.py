@@ -159,10 +159,10 @@ class StepProfilingCallback(TrainerCallback):
         self._step_time_total += elapsed
         self._steps += 1
 
-        world_size = max(1, int(getattr(args, 'world_size', 1)))
-        global_batch_size = int(args.per_device_train_batch_size) * world_size
-        logs: dict[str, float] = {
-            'step': float(state.global_step),
+        world_size = max(1, getattr(args, 'world_size', 1))
+        global_batch_size = args.per_device_train_batch_size * world_size
+        logs: dict[str, float | int] = {
+            'step': state.global_step,
             'profiling/step_time_s': float(elapsed),
             'profiling/step_time_avg_s': float(self._step_time_total / self._steps),
             'profiling/samples_per_sec': float(global_batch_size / max(elapsed, 1e-12)),
