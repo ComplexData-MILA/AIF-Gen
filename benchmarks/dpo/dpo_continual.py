@@ -81,7 +81,6 @@ def validate_reward_model_paths(
 
     for task_index in range(num_tasks):
         reward_path = get_task_reward_model_path(reward_model_root, task_index)
-        assert reward_path is not None
         try:
             AutoModelForSequenceClassification.from_pretrained(
                 reward_path,

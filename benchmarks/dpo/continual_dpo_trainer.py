@@ -325,6 +325,8 @@ class ContinualDPOTrainer(DPOTrainer):
 
             with torch.inference_mode():
                 for batch in self.eval_policy_dataloader:
+                    # `eval_policy_dataloader` is built from `preprocess_policy_dataset`, which stores prompts under
+                    # `input_ids` for reward-based policy evaluation only.
                     query = batch['input_ids'].to(self.accelerator.device)
                     context_length = query.shape[1]
                     with unwrap_model_for_generation(
@@ -394,6 +396,8 @@ class ContinualDPOTrainer(DPOTrainer):
                         if batch_index >= batches_to_log:
                             break
 
+                        # `get_eval_dataloader()` uses the tokenized DPO eval dataset, where prompts are kept under
+                        # `prompt_input_ids` together with the chosen/rejected preference targets.
                         query = batch['prompt_input_ids'].to(self.accelerator.device)
                         context_length = query.shape[1]
                         query_response, _ = batch_generation(
