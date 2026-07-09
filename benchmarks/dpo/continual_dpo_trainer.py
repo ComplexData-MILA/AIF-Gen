@@ -154,10 +154,12 @@ class StepProfilingCallback(TrainerCallback):
 
     @override
     def on_step_end(self, args, state, control, **kwargs):
-        if self._step_start_time is None:
+        step_start_time = self._step_start_time
+        self._step_start_time = None
+        if step_start_time is None:
             return control
 
-        elapsed = time.perf_counter() - self._step_start_time
+        elapsed = time.perf_counter() - step_start_time
         self._step_time_total += elapsed
         self._steps += 1
 
@@ -182,8 +184,6 @@ class StepProfilingCallback(TrainerCallback):
 
         if self.profiler is not None:
             self.profiler.step()
-
-        self._step_start_time = None
         return control
 
 

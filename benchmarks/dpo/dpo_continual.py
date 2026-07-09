@@ -4,7 +4,7 @@ import os
 import time
 import warnings
 from contextlib import contextmanager
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from datasets import Dataset
@@ -143,7 +143,7 @@ def _build_torch_profiler(
 
 
 @contextmanager
-def _time_phase(label: str, wandb_run: Optional[object], enabled: bool):
+def _time_phase(label: str, wandb_run: Optional[Any], enabled: bool):
     if not enabled:
         yield
         return
@@ -285,7 +285,6 @@ def main(
             print('Training dataset:', current_dataset_name)
             should_profile_first_task = (
                 training_args.enable_profiling
-                and profiler is not None
                 and not first_task_profiled
             )
             if should_profile_first_task:
