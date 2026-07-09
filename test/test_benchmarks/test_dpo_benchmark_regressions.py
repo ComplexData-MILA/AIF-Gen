@@ -119,3 +119,37 @@ def test_dpo_script_has_explicit_reward_model_loader_helper() -> None:
 
     assert 'AutoModelForSequenceClassification.from_pretrained' in source
     assert 'torch_dtype' in source
+
+
+def test_step_profiling_callback_records_gpu_memory_metrics_when_enabled() -> None:
+    trainer_module = parse_module(TRAINER_PATH)
+    trainer_class = get_class(trainer_module, 'StepProfilingCallback')
+    method = get_method(trainer_class, 'on_step_end')
+    source = ast.unparse(method)
+
+    assert 'self.profile_memory and torch.cuda.is_available()' in source
+    assert 'torch.cuda.memory_allocated()' in source
+    assert 'torch.cuda.memory_reserved()' in source
+    assert 'profiling/gpu_memory_allocated_gb' in source
+    assert 'profiling/gpu_memory_reserved_gb' in source
+
+
+def test_torch_profiler_helper_threads_profile_memory_setting() -> None:
+    script_module = parse_module(SCRIPT_PATH)
+    profiler_helper = get_function(script_module, '_build_torch_profiler')
+    source = ast.unparse(profiler_helper)
+
+    assert 'profile_memory=training_args.profile_memory' in source
+
+
+def test_dpo_script_tracks_peak_cuda_memory_per_task_when_profiling() -> None:
+    script_module = parse_module(SCRIPT_PATH)
+    main_function = get_function(script_module, 'main')
+    source = ast.unparse(main_function)
+
+    assert 'torch.cuda.reset_peak_memory_stats()' in source
+    assert 'torch.cuda.max_memory_allocated()' in source
+    assert 'torch.cuda.max_memory_reserved()' in source
+    assert 'profiling/task_' in source
+    assert 'peak_memory_allocated_gb' in source
+    assert 'peak_memory_reserved_gb' in source
