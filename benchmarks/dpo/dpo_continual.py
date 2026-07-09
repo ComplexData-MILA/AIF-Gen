@@ -149,7 +149,10 @@ def _build_torch_profiler(
 
 @contextmanager
 def _time_phase(label: str, wandb_run: Optional[Any], enabled: bool):
-    """Time a logical phase and optionally log elapsed seconds to Weights & Biases."""
+    """Time a logical phase and optionally log elapsed seconds to Weights & Biases.
+
+    When ``enabled`` is False this context manager is a no-op and does not collect timing.
+    """
     if not enabled:
         yield
         return
@@ -291,6 +294,8 @@ def main(
                 training_args.enable_profiling
                 and not first_task_profiled
             )
+            # Profile only the first task to capture representative kernels without duplicating
+            # large trace files across all continual tasks.
             if should_profile_first_task:
                 profiler.start()
             try:

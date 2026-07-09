@@ -155,11 +155,13 @@ class StepProfilingCallback(TrainerCallback):
 
     @override
     def on_step_begin(self, args, state, control, **kwargs):
+        """Capture step start timestamp before each optimizer step."""
         self._step_start_time = time.perf_counter()
         return control
 
     @override
     def on_step_end(self, args, state, control, **kwargs):
+        """Log per-step timing/memory metrics and advance profiler when available."""
         step_start_time = self._step_start_time
         self._step_start_time = None
         if step_start_time is None:
