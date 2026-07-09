@@ -228,9 +228,7 @@ def main(
     explicit_policy_eval = training_args.eval_policy_metrics or training_args.log_completions
 
     if training_args.eval_policy_metrics and training_args.reward_model_path is None:
-        raise ValueError(
-            'Cannot use --eval_policy_metrics without --reward_model_path; reward model path must be specified for policy evaluation.'
-        )
+        raise ValueError('Cannot use --eval_policy_metrics without --reward_model_path.')
 
     if explicit_policy_eval:
         validate_reward_model_paths(
@@ -317,17 +315,25 @@ def main(
                             torch_dtype,
                             model_args.trust_remote_code,
                         )
-                        try:
-                            metrics.update(trainer.evaluate_policy(reward_model=reward_model))
-                            if training_args.log_completions:
+                        if training_args.eval_policy_metrics:
+                            try:
+                                metrics.update(
+                                    trainer.evaluate_policy(reward_model=reward_model)
+                                )
+                            except Exception as exc:
+                                raise RuntimeError(
+                                    f'Reward-model policy evaluation failed for task {task_index} ({current_dataset_name}).'
+                                ) from exc
+                        if training_args.log_completions:
+                            try:
                                 trainer.generate_completions_table(
                                     reward_model=reward_model,
                                     max_batches=training_args.completion_logging_batches,
                                 )
-                        except Exception as exc:
-                            raise RuntimeError(
-                                f'Explicit policy evaluation failed for task {task_index} ({current_dataset_name}).'
-                            ) from exc
+                            except Exception as exc:
+                                raise RuntimeError(
+                                    f'Completion generation logging failed for task {task_index} ({current_dataset_name}).'
+                                ) from exc
                 finally:
                     if reward_model is not None:
                         del reward_model
