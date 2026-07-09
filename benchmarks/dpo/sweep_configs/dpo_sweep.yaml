@@ -17,7 +17,8 @@ parameters:
   eval_steps:
     values: [100, 200]
 command:
-  - python
+  - uv
+  - run
   - benchmarks/dpo/dpo_continual.py
   - --dataset_name
   - debug

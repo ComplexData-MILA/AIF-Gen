@@ -1,7 +1,7 @@
 import ast
 from pathlib import Path
 
-REPO_ROOT = Path('/home/runner/work/AIF-Gen/AIF-Gen')
+REPO_ROOT = Path(__file__).resolve().parents[2]
 TRAINER_PATH = REPO_ROOT / 'benchmarks/dpo/continual_dpo_trainer.py'
 SCRIPT_PATH = REPO_ROOT / 'benchmarks/dpo/dpo_continual.py'
 
