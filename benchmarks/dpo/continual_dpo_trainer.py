@@ -134,6 +134,8 @@ class ContinualDPOConfig(DPOConfig):
 
 
 class StepProfilingCallback(TrainerCallback):
+    """Track per-step timing/memory metrics and optionally advance a torch profiler."""
+
     def __init__(
         self,
         profiler: Optional[Any] = None,

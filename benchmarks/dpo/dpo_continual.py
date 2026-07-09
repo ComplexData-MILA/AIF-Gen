@@ -118,7 +118,9 @@ def load_reward_model_for_task(
     )
 
 
-def _build_torch_profiler(training_args: ContinualDPOConfig):
+def _build_torch_profiler(
+    training_args: ContinualDPOConfig,
+) -> Optional[torch.profiler.profile]:
     if not training_args.enable_profiling:
         return None
 
@@ -141,7 +143,7 @@ def _build_torch_profiler(training_args: ContinualDPOConfig):
 
 
 @contextmanager
-def _time_phase(label: str, wandb_run, enabled: bool):
+def _time_phase(label: str, wandb_run: Optional[object], enabled: bool):
     if not enabled:
         yield
         return
