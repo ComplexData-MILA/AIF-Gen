@@ -40,6 +40,7 @@ def warn_for_memory_settings(
     training_args: ContinualDPOConfig,
     model_args: ModelConfig,
 ) -> None:
+    """Warn when configuration choices are likely to increase memory usage."""
     if training_args.max_completion_length is None:
         warnings.warn(
             'max_completion_length is unset. Long chosen/rejected responses can still cause large padded DPO batches; '
@@ -71,6 +72,7 @@ def get_task_reward_model_path(
     reward_model_root: Optional[str],
     task_index: int,
 ) -> Optional[str]:
+    """Build the task-specific reward-model path from the root path and task index."""
     if reward_model_root is None:
         return None
     return f'{reward_model_root}_{task_index}'
@@ -80,6 +82,7 @@ def validate_reward_model_paths(
     reward_model_root: Optional[str],
     num_tasks: int,
 ) -> None:
+    """Validate that each per-task reward model path exists and is loadable."""
     if reward_model_root is None:
         return
 
@@ -101,6 +104,7 @@ def load_reward_model_for_task(
     torch_dtype: Optional[torch.dtype],
     trust_remote_code: bool,
 ) -> Optional[AutoModelForSequenceClassification]:
+    """Load the reward model checkpoint associated with a specific continual task."""
     reward_path = get_task_reward_model_path(reward_model_root, task_index)
     if reward_path is None:
         return None
@@ -121,6 +125,7 @@ def load_reward_model_for_task(
 def _build_torch_profiler(
     training_args: ContinualDPOConfig,
 ) -> Optional[torch.profiler.profile]:
+    """Create a configured torch profiler when profiling is enabled, otherwise return None."""
     if not training_args.enable_profiling:
         return None
 
@@ -144,6 +149,7 @@ def _build_torch_profiler(
 
 @contextmanager
 def _time_phase(label: str, wandb_run: Optional[Any], enabled: bool):
+    """Time a logical phase and optionally log elapsed seconds to Weights & Biases."""
     if not enabled:
         yield
         return

@@ -141,6 +141,12 @@ class StepProfilingCallback(TrainerCallback):
         profiler: Optional[Any] = None,
         profile_memory: bool = False,
     ) -> None:
+        """Initialize optional step-level profiler and memory metric tracking.
+
+        Args:
+            profiler: Torch profiler instance to advance once per training step.
+            profile_memory: Whether to collect CUDA allocated/reserved memory metrics.
+        """
         self.profiler = profiler
         self.profile_memory = profile_memory
         self._step_start_time: Optional[float] = None
