@@ -11,13 +11,13 @@ parameters:
   num_train_epochs:
     values: [1, 2, 3]
   per_device_train_batch_size:
-    values: [1, 2, 4]
+    values: [1, 2]
   gradient_checkpointing:
     values: [true, false]
   eval_steps:
-    values: [50, 100]
+    values: [100, 200]
 command:
-  - uv run
+  - python
   - benchmarks/dpo/dpo_continual.py
   - --dataset_name
   - debug
@@ -36,7 +36,15 @@ command:
   - --eval_steps
   - ${eval_steps}
   - --logging_steps
-  - 25
-  - --run_output_dir
+  - 100
+  - --bf16
+  - --output_dir
   - Qwen2-0.5B-DPO
+  - --max_prompt_length
+  - 256
+  - --max_completion_length
+  - 256
+  - --max_length
+  - 512
+  - --use_peft
   - --no_remove_unused_columns
