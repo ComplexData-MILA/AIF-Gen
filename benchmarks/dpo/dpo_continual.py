@@ -155,8 +155,7 @@ def main(
         ref_model = None
 
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path,
-        trust_remote_code=model_args.trust_remote_code,
+        model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
     )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -255,7 +254,7 @@ def main(
         trainer.save_model(os.path.join(training_args.output_dir, 'last'))
         if training_args.push_to_hub:
             trainer.push_to_hub(
-                dataset_name='Continual_DPO_' + script_args.dataset_name + '_' + str(task_index)
+                dataset_name=f'Continual_DPO_{script_args.dataset_name}_{task_index}'
             )
 
 
