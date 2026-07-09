@@ -13,7 +13,7 @@ machine_rank: 0
 main_training_function: main
 mixed_precision: bf16
 num_machines: 1
-num_processes: 4  # Set this to the number of GPUs you are actually launching.
+num_processes: 1  # Placeholder: edit this to your actual GPU count before multi-GPU launch.
 rdzv_backend: static
 same_network: true
 tpu_env: []

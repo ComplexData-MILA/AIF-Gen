@@ -272,7 +272,10 @@ class ContinualDPOTrainer(DPOTrainer):
         disable_dropout_in_model(active_reward_model)
         active_reward_model.eval()
 
-        original_device = next(active_reward_model.parameters()).device
+        first_parameter = next(active_reward_model.parameters(), None)
+        original_device = (
+            first_parameter.device if first_parameter is not None else self.accelerator.device
+        )
         target_device = self.accelerator.device
         moved_to_accelerator = original_device != target_device
         if moved_to_accelerator:

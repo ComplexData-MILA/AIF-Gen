@@ -86,9 +86,12 @@ def validate_reward_model_paths(
                 reward_path,
                 num_labels=1,
             )
-        except Exception:
+        except Exception as exc:
             if not os.path.exists(reward_path):
-                raise ValueError(f'Reward model not found at {reward_path}') from None
+                raise ValueError(f'Reward model not found at {reward_path}') from exc
+            raise ValueError(
+                f'Failed to load reward model at {reward_path}: {exc}'
+            ) from exc
 
 
 def load_reward_model_for_task(
@@ -105,7 +108,7 @@ def load_reward_model_for_task(
         'num_labels': 1,
         'trust_remote_code': trust_remote_code,
     }
-    if isinstance(torch_dtype, torch.dtype):
+    if torch_dtype is not None:
         reward_model_kwargs['torch_dtype'] = torch_dtype
 
     return AutoModelForSequenceClassification.from_pretrained(
