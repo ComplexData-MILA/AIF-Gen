@@ -351,7 +351,7 @@ class ContinualDPOTrainer(DPOTrainer):
                 self.accelerator,
                 gather_deepspeed3_params=None,
             ) as unwrapped_model:
-                for batch in self.eval_dataloader:
+                for batch in self.eval_policy_dataloader:
                     query = batch['input_ids']
                     context_length = query.shape[1]
                     query_response, _ = batch_generation(
