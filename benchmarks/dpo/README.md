@@ -2,16 +2,13 @@
 
 ## Install benchmark dependencies
 
-```sh
-pip install -e .
-pip install pytest ruff accelerate==0.34.2 deepspeed==0.16.3 datasets>=3.2.0 numpy pandas wandb transformers>=4.49.0 trl>=0.15.2 peft>=0.14.0
-```
-
-If you use the project's preferred workflow, sync the benchmark group instead:
+The preferred setup is:
 
 ```sh
 uv sync --group benchmarks --group dev
 ```
+
+If you manage dependencies with plain pip instead, install the repository plus the benchmark extras listed in `pyproject.toml` (for example: `pytest`, `ruff`, `transformers`, `trl`, `accelerate`, `deepspeed`, `datasets`, `numpy`, `pandas`, `wandb`, and `peft`).
 
 ## What changed in this benchmark
 

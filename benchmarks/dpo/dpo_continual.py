@@ -7,6 +7,7 @@ from typing import Optional
 import torch
 from datasets import Dataset
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -82,10 +83,7 @@ def validate_reward_model_paths(
     for task_index in range(num_tasks):
         reward_path = get_task_reward_model_path(reward_model_root, task_index)
         try:
-            AutoModelForSequenceClassification.from_pretrained(
-                reward_path,
-                num_labels=1,
-            )
+            AutoConfig.from_pretrained(reward_path, trust_remote_code=True)
         except Exception as exc:
             if not os.path.exists(reward_path):
                 raise ValueError(f'Reward model not found at {reward_path}') from exc
@@ -230,12 +228,17 @@ def main(
                         torch_dtype,
                         model_args.trust_remote_code,
                     )
-                    metrics.update(trainer.evaluate_policy(reward_model=reward_model))
-                    if training_args.log_completions:
-                        trainer.generate_completions_table(
-                            reward_model=reward_model,
-                            max_batches=training_args.completion_logging_batches,
-                        )
+                    try:
+                        metrics.update(trainer.evaluate_policy(reward_model=reward_model))
+                        if training_args.log_completions:
+                            trainer.generate_completions_table(
+                                reward_model=reward_model,
+                                max_batches=training_args.completion_logging_batches,
+                            )
+                    except Exception as exc:
+                        raise RuntimeError(
+                            f'Explicit policy evaluation failed for task {task_index} ({current_dataset_name}).'
+                        ) from exc
             finally:
                 if reward_model is not None:
                     del reward_model

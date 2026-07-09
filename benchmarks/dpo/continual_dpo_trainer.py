@@ -224,6 +224,12 @@ class ContinualDPOTrainer(DPOTrainer):
         self,
         reward_model: Optional[Union[PreTrainedModel, nn.Module, str]],
     ) -> None:
+        """Store a reward model for explicit evaluation-only flows.
+
+        This does not move or DeepSpeed-wrap the reward model during training; it only updates
+        the optional model used by ``reward_model_context`` when explicit policy evaluation or
+        completion logging is requested.
+        """
         self.reward_model = reward_model
         if self.reward_model is not None and not isinstance(self.reward_model, str):
             disable_dropout_in_model(self.reward_model)
