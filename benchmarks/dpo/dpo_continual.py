@@ -1,7 +1,9 @@
 """Adaptation of the DPO TRL training script for continual learning."""
 
 import os
+import time
 import warnings
+from contextlib import contextmanager
 from typing import Optional
 
 import torch
@@ -28,6 +30,7 @@ from benchmarks.dpo.continual_dpo_trainer import (
     ContinualDPOArguments,
     ContinualDPOConfig,
     ContinualDPOTrainer,
+    StepProfilingCallback,
 )
 
 
@@ -115,6 +118,44 @@ def load_reward_model_for_task(
     )
 
 
+def _build_torch_profiler(training_args: ContinualDPOConfig):
+    if not training_args.enable_profiling:
+        return None
+
+    active_steps = max(1, int(training_args.profiling_steps))
+    os.makedirs(training_args.profile_output_dir, exist_ok=True)
+
+    activities = [torch.profiler.ProfilerActivity.CPU]
+    if torch.cuda.is_available():
+        activities.append(torch.profiler.ProfilerActivity.CUDA)
+
+    return torch.profiler.profile(
+        activities=activities,
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=active_steps),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler(
+            training_args.profile_output_dir
+        ),
+        record_shapes=True,
+        profile_memory=training_args.profile_memory,
+    )
+
+
+@contextmanager
+def _time_phase(label: str, wandb_run, enabled: bool):
+    if not enabled:
+        yield
+        return
+
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+        print(f'[{label}] elapsed: {elapsed:.3f}s')
+        if wandb_run is not None:
+            wb.log({f'profiling/{label}_time_s': float(elapsed)})
+
+
 def main(
     script_args: ContinualDPOArguments,
     training_args: ContinualDPOConfig,
@@ -167,12 +208,13 @@ def main(
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
 
-    continual_dataset: list[dict[str, Dataset]] = init_continual_dataset(
-        script_args.dataset_name,
-        mock=training_args.mock,
-        tokenizer=tokenizer,
-        tools=training_args.tools,
-    )
+    with _time_phase('data_loading', wb.run, training_args.enable_profiling):
+        continual_dataset: list[dict[str, Dataset]] = init_continual_dataset(
+            script_args.dataset_name,
+            mock=training_args.mock,
+            tokenizer=tokenizer,
+            tools=training_args.tools,
+        )
     output_dir = training_args.output_dir
     eval_enabled = training_args.eval_strategy != 'no'
     explicit_policy_eval = training_args.eval_policy_metrics or training_args.log_completions
@@ -196,66 +238,123 @@ def main(
         eval_dataset=first_dataset.get(script_args.dataset_test_split),
         peft_config=peft_config,
     )
+    profiler = _build_torch_profiler(training_args)
+    if training_args.enable_profiling:
+        trainer.add_callback(
+            StepProfilingCallback(
+                profiler=profiler,
+                profile_memory=training_args.profile_memory,
+            )
+        )
 
     if wb.run is not None:
         wb.log({'dataset/name': script_args.dataset_name})
+    if training_args.enable_profiling and torch.cuda.is_available():
+        print('CUDA memory summary before continual loop:')
+        print(torch.cuda.memory_summary())
 
+    first_task_profiled = False
     for task_index, dataset in enumerate(continual_dataset):
-        current_dataset_name = f'dataset-{task_index}'
-        training_args.output_dir = f'{output_dir}/{current_dataset_name}'
-        trainer.args.output_dir = training_args.output_dir
+        with _time_phase(
+            f'task_{task_index}',
+            wb.run,
+            training_args.enable_profiling,
+        ):
+            current_dataset_name = f'dataset-{task_index}'
+            training_args.output_dir = f'{output_dir}/{current_dataset_name}'
+            trainer.args.output_dir = training_args.output_dir
 
-        if task_index > 0:
-            trainer.set_task_datasets(
-                train_dataset=dataset[script_args.dataset_train_split],
-                eval_dataset=dataset.get(script_args.dataset_test_split),
-                dataset_name=current_dataset_name,
+            if task_index > 0:
+                trainer.set_task_datasets(
+                    train_dataset=dataset[script_args.dataset_train_split],
+                    eval_dataset=dataset.get(script_args.dataset_test_split),
+                    dataset_name=current_dataset_name,
+                )
+
+            if training_args.enable_profiling and torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+                print(
+                    f'CUDA memory summary at task {task_index} start ({current_dataset_name}):'
+                )
+                print(torch.cuda.memory_summary())
+
+            print('Training dataset:', current_dataset_name)
+            should_profile_first_task = (
+                training_args.enable_profiling
+                and profiler is not None
+                and not first_task_profiled
             )
-
-        print('Training dataset:', current_dataset_name)
-        trainer.train()
-
-        should_run_task_eval = eval_enabled or explicit_policy_eval
-        if should_run_task_eval and trainer.eval_dataset is not None:
-            metrics = trainer.evaluate()
-            reward_model = None
+            if should_profile_first_task:
+                profiler.start()
             try:
-                if explicit_policy_eval:
-                    reward_model = load_reward_model_for_task(
-                        training_args.reward_model_path,
-                        task_index,
-                        torch_dtype,
-                        model_args.trust_remote_code,
-                    )
-                    try:
-                        metrics.update(trainer.evaluate_policy(reward_model=reward_model))
-                        if training_args.log_completions:
-                            trainer.generate_completions_table(
-                                reward_model=reward_model,
-                                max_batches=training_args.completion_logging_batches,
-                            )
-                    except Exception as exc:
-                        raise RuntimeError(
-                            f'Explicit policy evaluation failed for task {task_index} ({current_dataset_name}).'
-                        ) from exc
+                trainer.train()
             finally:
-                if reward_model is not None:
-                    del reward_model
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                if should_profile_first_task:
+                    profiler.stop()
+                    first_task_profiled = True
+                    print(
+                        f'Profiler trace exported to {training_args.profile_output_dir} for task {task_index}.'
+                    )
 
-            metrics['dataset'] = task_index
-            trainer.log_metrics(f'eval/dataset/{task_index}', metrics)
-            trainer.save_metrics('eval', metrics)
-            if wb.run is not None:
-                wb.log({'eval/last': metrics})
-                wb.log({f'task/{current_dataset_name}/last': metrics})
+            should_run_task_eval = eval_enabled or explicit_policy_eval
+            if should_run_task_eval and trainer.eval_dataset is not None:
+                metrics = trainer.evaluate()
+                reward_model = None
+                try:
+                    if explicit_policy_eval:
+                        reward_model = load_reward_model_for_task(
+                            training_args.reward_model_path,
+                            task_index,
+                            torch_dtype,
+                            model_args.trust_remote_code,
+                        )
+                        try:
+                            metrics.update(trainer.evaluate_policy(reward_model=reward_model))
+                            if training_args.log_completions:
+                                trainer.generate_completions_table(
+                                    reward_model=reward_model,
+                                    max_batches=training_args.completion_logging_batches,
+                                )
+                        except Exception as exc:
+                            raise RuntimeError(
+                                f'Explicit policy evaluation failed for task {task_index} ({current_dataset_name}).'
+                            ) from exc
+                finally:
+                    if reward_model is not None:
+                        del reward_model
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
 
-        trainer.save_model(os.path.join(training_args.output_dir, 'last'))
-        if training_args.push_to_hub:
-            trainer.push_to_hub(
-                dataset_name=f'Continual_DPO_{script_args.dataset_name}_{task_index}'
-            )
+                metrics['dataset'] = task_index
+                trainer.log_metrics(f'eval/dataset/{task_index}', metrics)
+                trainer.save_metrics('eval', metrics)
+                if wb.run is not None:
+                    wb.log({'eval/last': metrics})
+                    wb.log({f'task/{current_dataset_name}/last': metrics})
+
+            if training_args.enable_profiling and torch.cuda.is_available():
+                peak_allocated_gb = float(torch.cuda.max_memory_allocated() / (1024**3))
+                peak_reserved_gb = float(torch.cuda.max_memory_reserved() / (1024**3))
+                print(
+                    f'Task {task_index} peak CUDA memory (GB): allocated={peak_allocated_gb:.3f}, reserved={peak_reserved_gb:.3f}'
+                )
+                if wb.run is not None:
+                    wb.log(
+                        {
+                            f'profiling/task_{task_index}_peak_memory_allocated_gb': peak_allocated_gb,
+                            f'profiling/task_{task_index}_peak_memory_reserved_gb': peak_reserved_gb,
+                        }
+                    )
+
+            trainer.save_model(os.path.join(training_args.output_dir, 'last'))
+            if training_args.push_to_hub:
+                trainer.push_to_hub(
+                    dataset_name=f'Continual_DPO_{script_args.dataset_name}_{task_index}'
+                )
+
+    if training_args.enable_profiling and torch.cuda.is_available():
+        print('CUDA memory summary after continual loop:')
+        print(torch.cuda.memory_summary())
 
 
 if __name__ == '__main__':

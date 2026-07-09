@@ -1,8 +1,9 @@
 import os
+import time
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -112,6 +113,76 @@ class ContinualDPOConfig(DPOConfig):
             'help': 'Number of evaluation batches to sample when --log_completions is enabled.'
         },
     )
+    enable_profiling: bool = field(
+        default=False,
+        metadata={'help': 'Enable profiling hooks for continual DPO runs.'},
+    )
+    profiling_steps: int = field(
+        default=3,
+        metadata={
+            'help': 'Number of active steps to capture with torch profiler when profiling is enabled.'
+        },
+    )
+    profile_memory: bool = field(
+        default=False,
+        metadata={'help': 'Enable CUDA memory tracing when profiling is enabled.'},
+    )
+    profile_output_dir: str = field(
+        default='profiles/continual_dpo',
+        metadata={'help': 'Output directory for torch profiler TensorBoard traces.'},
+    )
+
+
+class StepProfilingCallback(TrainerCallback):
+    def __init__(
+        self,
+        profiler: Optional[Any] = None,
+        profile_memory: bool = False,
+    ) -> None:
+        self.profiler = profiler
+        self.profile_memory = profile_memory
+        self._step_start_time: Optional[float] = None
+        self._step_time_total: float = 0.0
+        self._steps: int = 0
+
+    @override
+    def on_step_begin(self, args, state, control, **kwargs):
+        self._step_start_time = time.perf_counter()
+        return control
+
+    @override
+    def on_step_end(self, args, state, control, **kwargs):
+        if self._step_start_time is None:
+            return control
+
+        elapsed = time.perf_counter() - self._step_start_time
+        self._step_time_total += elapsed
+        self._steps += 1
+
+        world_size = max(1, int(getattr(args, 'world_size', 1)))
+        global_batch_size = int(args.per_device_train_batch_size) * world_size
+        logs: dict[str, float] = {
+            'step': float(state.global_step),
+            'profiling/step_time_s': float(elapsed),
+            'profiling/step_time_avg_s': float(self._step_time_total / self._steps),
+            'profiling/samples_per_sec': float(global_batch_size / max(elapsed, 1e-12)),
+        }
+
+        if self.profile_memory and torch.cuda.is_available():
+            logs['profiling/gpu_memory_allocated_gb'] = float(
+                torch.cuda.memory_allocated() / (1024**3)
+            )
+            logs['profiling/gpu_memory_reserved_gb'] = float(
+                torch.cuda.memory_reserved() / (1024**3)
+            )
+
+        state.log_history.append(logs)
+
+        if self.profiler is not None:
+            self.profiler.step()
+
+        self._step_start_time = None
+        return control
 
 
 class ContinualDPOTrainer(DPOTrainer):
